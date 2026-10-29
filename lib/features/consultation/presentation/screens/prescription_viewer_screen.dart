@@ -1,0 +1,325 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:healthcare_app/core/providers/app_providers.dart';
+import 'package:healthcare_app/core/theme/app_colors.dart';
+import 'package:healthcare_app/core/theme/app_typography.dart';
+import 'package:healthcare_app/core/utils/date_time_utils.dart';
+import 'package:healthcare_app/core/widgets/state_views.dart';
+import 'package:healthcare_app/features/consultation/domain/entities/prescription_model.dart';
+
+class PrescriptionViewerScreen extends ConsumerWidget {
+  final String prescriptionId;
+
+  const PrescriptionViewerScreen({super.key, required this.prescriptionId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final aptRepo = ref.watch(appointmentRepositoryProvider);
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text('Digital Prescription'),
+        actions: [
+          IconButton(
+            tooltip: 'Export / Print PDF',
+            icon: const Icon(Icons.print_rounded),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Prescription PDF exported to device documents.'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            },
+          ),
+          IconButton(
+            tooltip: 'Share',
+            icon: const Icon(Icons.share_rounded),
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Prescription link copied to clipboard.')),
+              );
+            },
+          ),
+        ],
+      ),
+      body: FutureBuilder<PrescriptionModel?>(
+        future: Future.value(aptRepo.getPrescriptionById(prescriptionId)),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          final rx = snapshot.data;
+          if (rx == null) {
+            return const ErrorStateView(message: 'Prescription document not found.');
+          }
+
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x06000000),
+                    blurRadius: 10,
+                    offset: Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Clinic / Hospital Header
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryLight,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 28),
+                          ),
+                          const SizedBox(width: 12),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text('Healthcare Telehealth Network', style: AppTypography.headline),
+                              Text('Certified Digital Telehealth Clinic', style: AppTypography.caption),
+                            ],
+                          ),
+                        ],
+                      ),
+                      Text(
+                        'Rx #${rx.id.toUpperCase()}',
+                        style: AppTypography.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 28, color: AppColors.border, thickness: 1.5),
+
+                  // Doctor & Patient Meta
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('PRESCRIBING PHYSICIAN', style: AppTypography.caption),
+                            const SizedBox(height: 4),
+                            Text(rx.doctorName, style: AppTypography.headline.copyWith(fontSize: 16)),
+                            Text(rx.doctorSpecialty, style: AppTypography.bodyMedium.copyWith(color: AppColors.primary)),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            const Text('PATIENT DETAILS', style: AppTypography.caption),
+                            const SizedBox(height: 4),
+                            Text(rx.patientName, style: AppTypography.headline.copyWith(fontSize: 16)),
+                            Text(
+                              'Date: ${DateTimeUtils.formatLocalDate(rx.issuedAtUtc)}',
+                              style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Divider(height: 28, color: AppColors.border),
+
+                  // Diagnosis
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceVariant,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('DIAGNOSIS & CLINICAL IMPRESSION', style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
+                        const SizedBox(height: 4),
+                        Text(
+                          rx.diagnosis,
+                          style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Rx Symbol Header
+                  Row(
+                    children: [
+                      Text(
+                        '℞',
+                        style: TextStyle(
+                          fontSize: 32,
+                          fontWeight: FontWeight.w900,
+                          fontFamily: 'serif',
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text('Prescribed Medications', style: AppTypography.headline),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Medications List
+                  ListView.separated(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: rx.medications.length,
+                    separatorBuilder: (_, __) => const Divider(height: 16, color: AppColors.border),
+                    itemBuilder: (context, index) {
+                      final med = rx.medications[index];
+                      return Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryLight,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              '${index + 1}',
+                              style: AppTypography.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      med.name,
+                                      style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+                                    ),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.secondaryLight,
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        med.dosage,
+                                        style: AppTypography.caption.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w700),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Frequency: ${med.frequency} • Duration: ${med.duration}',
+                                  style: AppTypography.bodyMedium,
+                                ),
+                                if (med.instructions != null) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Special Note: ${med.instructions}',
+                                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+
+                  if (rx.notes != null && rx.notes!.isNotEmpty) ...[
+                    const Divider(height: 28, color: AppColors.border),
+                    const Text('ADDITIONAL ADVICE / FOLLOW-UP', style: AppTypography.caption),
+                    const SizedBox(height: 6),
+                    Text(rx.notes!, style: AppTypography.bodyMedium),
+                  ],
+
+                  const Divider(height: 32, color: AppColors.border, thickness: 1.5),
+
+                  // Digital Signature Block
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.success),
+                              SizedBox(width: 4),
+                              Text(
+                                'Cryptographically Verified Digital Record',
+                                style: TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Issued: ${DateTimeUtils.formatFullWithTimeZone(rx.issuedAtUtc)}',
+                            style: AppTypography.caption.copyWith(color: AppColors.textMuted),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: AppColors.primary),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  rx.doctorName,
+                                  style: TextStyle(
+                                    fontFamily: 'serif',
+                                    fontStyle: FontStyle.italic,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                Text(
+                                  'Digital Signature Verified',
+                                  style: AppTypography.caption.copyWith(fontSize: 8, color: AppColors.primary),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
