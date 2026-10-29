@@ -1,0 +1,91 @@
+# -----------------------------------------------------------------------------
+# Documentation
+# -----------------------------------------------------------------------------
+/docs/
+
+# -----------------------------------------------------------------------------
+# Flutter / Dart / Pub
+# -----------------------------------------------------------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+/build/
+/coverage/
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.widget_preview/
+
+# Symbolication & Obfuscation
+app.*.symbols
+app.*.map.json
+
+# -----------------------------------------------------------------------------
+# Android Build Artifacts & Credentials
+# -----------------------------------------------------------------------------
+*.apk
+*.aab
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+/android/.gradle/
+/android/captures/
+/android/local.properties
+/android/**/key.properties
+*.jks
+*.keystore
+
+# -----------------------------------------------------------------------------
+# iOS Build Artifacts & Pods
+# -----------------------------------------------------------------------------
+/ios/.generated/
+/ios/Flutter/App.framework
+/ios/Flutter/Flutter.framework
+/ios/Flutter/Flutter.podspec
+/ios/Flutter/Generated.xcconfig
+/ios/Flutter/app.flx
+/ios/Flutter/app.zip
+/ios/Flutter/flutter_assets/
+/ios/Flutter/flutter_export_environment.sh
+/ios/Pods/
+/ios/Podfile.lock
+/ios/.symlinks/
+/ios/profile/
+/ios/debug/
+/ios/release/
+/ios/Runner.xcworkspace/xcuserdata/
+/ios/Runner.xcodeproj/xcuserdata/
+/ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+
+# -----------------------------------------------------------------------------
+# IDE, Editor & OS Files
+# -----------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IntelliJ IDEA
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# Visual Studio Code (Local settings/launch configs)
+.vscode/
+
+# Logs & Temporary files
+*.log
+*.class
+*.pyc
+*.swp
+*.bak
+*.tmp
+.history
+.build/
+.buildlog/
