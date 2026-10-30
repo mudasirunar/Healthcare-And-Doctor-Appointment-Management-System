@@ -1,26 +1,26 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:healthcare_app/features/auth/domain/entities/user_model.dart';
 import 'package:healthcare_app/features/auth/domain/repositories/auth_repository.dart';
-import 'package:healthcare_app/features/auth/data/repositories/mock_auth_repository.dart';
+import 'package:healthcare_app/features/auth/data/repositories/firebase_auth_repository.dart';
 import 'package:healthcare_app/features/doctor/domain/entities/doctor_model.dart';
 import 'package:healthcare_app/features/doctor/domain/entities/specialty_model.dart';
 import 'package:healthcare_app/features/doctor/domain/repositories/doctor_repository.dart';
-import 'package:healthcare_app/features/doctor/data/repositories/mock_doctor_repository.dart';
+import 'package:healthcare_app/features/doctor/data/repositories/firebase_doctor_repository.dart';
 import 'package:healthcare_app/features/appointment/domain/entities/appointment_model.dart';
 import 'package:healthcare_app/features/appointment/domain/repositories/appointment_repository.dart';
-import 'package:healthcare_app/features/appointment/data/repositories/mock_appointment_repository.dart';
+import 'package:healthcare_app/features/appointment/data/repositories/firebase_appointment_repository.dart';
 
-// --- REPOSITORIES ---
+// --- LIVE FIREBASE REPOSITORIES ---
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return MockAuthRepository();
+  return FirebaseAuthRepository();
 });
 
 final doctorRepositoryProvider = Provider<DoctorRepository>((ref) {
-  return MockDoctorRepository();
+  return FirebaseDoctorRepository();
 });
 
 final appointmentRepositoryProvider = Provider<AppointmentRepository>((ref) {
-  return MockAppointmentRepository();
+  return FirebaseAppointmentRepository();
 });
 
 // --- AUTH STATE ---
