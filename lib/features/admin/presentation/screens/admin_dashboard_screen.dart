@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/data/mock_data_store.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -112,7 +111,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
                 description: descCtrl.text.trim(),
                 iconName: 'healing',
               );
-              await MockDataStore.instance.saveSpecialty(newSpec);
+              await ref.read(doctorRepositoryProvider).saveSpecialty(newSpec);
               ref.invalidate(specialtiesProvider);
               setState(() {});
             },

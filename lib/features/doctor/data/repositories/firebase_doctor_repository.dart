@@ -78,6 +78,14 @@ class FirebaseDoctorRepository implements DoctorRepository {
   }
 
   @override
+  Future<void> saveSpecialty(SpecialtyModel specialty) async {
+    await _firestore
+        .collection('specialties')
+        .doc(specialty.id)
+        .set(specialty.toMap(), SetOptions(merge: true));
+  }
+
+  @override
   Future<List<DoctorModel>> getPendingVerificationDoctors() async {
     final querySnapshot = await _firestore
         .collection('doctors')

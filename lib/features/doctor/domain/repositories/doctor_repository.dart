@@ -13,6 +13,7 @@ abstract class DoctorRepository {
   Future<DoctorModel?> getDoctorById(String id);
   Future<DoctorModel?> getDoctorByUserId(String userId);
   Future<List<SpecialtyModel>> getSpecialties();
+  Future<void> saveSpecialty(SpecialtyModel specialty);
   Future<List<DoctorModel>> getPendingVerificationDoctors();
   Future<void> updateVerificationStatus(String doctorId, VerificationStatus status, [String? notes]);
   Future<void> updateDoctorAvailability(String doctorId, Map<String, List<TimeWindow>> weeklyAvailability, List<String> blackoutDates);

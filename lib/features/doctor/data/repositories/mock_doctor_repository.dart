@@ -44,6 +44,11 @@ class MockDoctorRepository implements DoctorRepository {
   }
 
   @override
+  Future<void> saveSpecialty(SpecialtyModel specialty) async {
+    await _dataStore.saveSpecialty(specialty);
+  }
+
+  @override
   Future<List<DoctorModel>> getPendingVerificationDoctors() async {
     return _dataStore.getPendingVerificationDoctors();
   }
