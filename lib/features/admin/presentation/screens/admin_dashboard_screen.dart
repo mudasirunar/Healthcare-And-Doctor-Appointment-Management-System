@@ -174,11 +174,11 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(
-          'Sign Out of Admin Desk?',
+          'Sign Out?',
           style: AppTypography.headline.copyWith(color: AppColors.textPrimaryOf(ctx)),
         ),
         content: Text(
-          'You will be returned to the login screen. Active platform locks and security rules remain enforced.',
+          'Are you sure you want to sign out of your account?',
           style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondaryOf(ctx)),
         ),
         actions: [
