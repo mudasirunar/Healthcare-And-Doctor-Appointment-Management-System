@@ -14,8 +14,8 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController(text: 'patient@healthcare.com');
-  final _passwordController = TextEditingController(text: 'Password123!');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _obscurePassword = true;
   String? _errorMessage;
@@ -57,14 +57,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         });
       }
     }
-  }
-
-  void _selectQuickPersona(String email, String roleLabel) {
-    setState(() {
-      _emailController.text = email;
-      _passwordController.text = 'Password123!';
-      _errorMessage = null;
-    });
   }
 
   void _showForgotPasswordDialog() {
@@ -174,64 +166,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       textAlign: TextAlign.center,
                       style: AppTypography.subtitle.copyWith(color: AppColors.textSecondary),
                     ),
-                    const SizedBox(height: 28),
-
-                    // Quick Switcher Card for Evaluators / Test Personas
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.touch_app_rounded, size: 16, color: AppColors.primary),
-                              const SizedBox(width: 6),
-                              Text(
-                                'Quick Demo Personas',
-                                style: AppTypography.caption.copyWith(color: AppColors.primary),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              _PersonaChip(
-                                label: 'Patient (Sarah)',
-                                email: 'patient@healthcare.com',
-                                isSelected: _emailController.text == 'patient@healthcare.com',
-                                onTap: () => _selectQuickPersona('patient@healthcare.com', 'Patient'),
-                              ),
-                              _PersonaChip(
-                                label: 'Doctor (Dr. Stone)',
-                                email: 'doctor@healthcare.com',
-                                isSelected: _emailController.text == 'doctor@healthcare.com',
-                                onTap: () => _selectQuickPersona('doctor@healthcare.com', 'Doctor'),
-                              ),
-                              _PersonaChip(
-                                label: 'Admin (Mark)',
-                                email: 'admin@healthcare.com',
-                                isSelected: _emailController.text == 'admin@healthcare.com',
-                                onTap: () => _selectQuickPersona('admin@healthcare.com', 'Admin'),
-                              ),
-                              _PersonaChip(
-                                label: 'New Doc (Pending)',
-                                email: 'doctor2@healthcare.com',
-                                isSelected: _emailController.text == 'doctor2@healthcare.com',
-                                onTap: () => _selectQuickPersona('doctor2@healthcare.com', 'Pending Doc'),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 32),
 
                     // Error Message
                     if (_errorMessage != null) ...[
@@ -352,42 +287,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PersonaChip extends StatelessWidget {
-  final String label;
-  final String email;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _PersonaChip({
-    required this.label,
-    required this.email,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : AppColors.surfaceVariant,
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Text(
-          label,
-          style: AppTypography.caption.copyWith(
-            color: isSelected ? Colors.white : AppColors.textPrimary,
-            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
       ),
