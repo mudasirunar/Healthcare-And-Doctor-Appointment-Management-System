@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/preferences_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Local User Preferences (ThemeMode persistence)
+  await PreferencesService.instance.initialize();
 
   // Native Firebase initialization using google-services.json & GoogleService-Info.plist
   try {

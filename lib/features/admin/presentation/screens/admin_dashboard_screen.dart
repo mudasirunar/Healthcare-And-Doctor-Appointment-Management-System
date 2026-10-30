@@ -3,9 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/widgets/state_views.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import '../../../doctor/domain/entities/specialty_model.dart';
+import 'admin_analytics_screen.dart';
+import 'admin_settings_screen.dart';
+import 'admin_specialties_screen.dart';
+import 'admin_verifications_screen.dart';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -16,18 +20,30 @@ class AdminDashboardScreen extends ConsumerStatefulWidget {
 
 class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   int _tabIndex = 0;
+  late final List<ScrollController> _scrollControllers = List.generate(
+    4,
+    (_) => ScrollController(),
+  );
 
-  void _handleApproveDoctor(DoctorModel doc) async {
+  @override
+  void dispose() {
+    for (final ctrl in _scrollControllers) {
+      ctrl.dispose();
+    }
+    super.dispose();
+  }
+
+  Future<void> _handleApproveDoctor(DoctorModel doc) async {
     final docRepo = ref.read(doctorRepositoryProvider);
     await docRepo.updateVerificationStatus(doc.id, VerificationStatus.approved);
     ref.invalidate(filteredDoctorsProvider);
-    setState(() {});
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${doc.doctorName} approved and published to doctor directory!'),
+          content: Text('${doc.doctorName} approved and published to directory.'),
           backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
         ),
       );
     }
@@ -38,38 +54,52 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Reject Credentials - ${doc.doctorName}'),
+        title: Text(
+          'Decline Credentials',
+          style: AppTypography.headline.copyWith(color: AppColors.textPrimaryOf(ctx)),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Specify reasons for verification rejection (e.g. invalid license number or unrecognized medical board):',
-              style: AppTypography.bodyMedium,
+            Text(
+              'Provide a reason for declining ${doc.doctorName} (e.g. unverified medical board license):',
+              style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondaryOf(ctx)),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: reasonController,
+              maxLines: 2,
               decoration: const InputDecoration(
-                labelText: 'Rejection Notes (Required)',
+                labelText: 'Rejection Reason',
+                hintText: 'Enter verification notes...',
               ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final reason = reasonController.text.trim();
               if (reason.isEmpty) return;
               Navigator.pop(ctx);
               final docRepo = ref.read(doctorRepositoryProvider);
-              await docRepo.updateVerificationStatus(doc.id, VerificationStatus.rejected, reason);
+              await docRepo.updateVerificationStatus(
+                doc.id,
+                VerificationStatus.rejected,
+                reason,
+              );
               ref.invalidate(filteredDoctorsProvider);
-              setState(() {});
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Reject Verification'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              minimumSize: const Size(120, 42),
+            ),
+            child: const Text('Decline'),
           ),
         ],
       ),
@@ -83,433 +113,327 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add Medical Specialty'),
+        title: Text(
+          'New Medical Specialty',
+          style: AppTypography.headline.copyWith(color: AppColors.textPrimaryOf(ctx)),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: nameCtrl,
-              decoration: const InputDecoration(labelText: 'Specialty Name (e.g. Ophthalmology)'),
+              decoration: const InputDecoration(
+                labelText: 'Department Name',
+                hintText: 'e.g. Ophthalmology',
+                prefixIcon: Icon(Icons.medical_information_outlined),
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 14),
             TextField(
               controller: descCtrl,
-              decoration: const InputDecoration(labelText: 'Brief Description'),
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Clinical Scope & Description',
+                hintText: 'e.g. Eye care, vision correction & retinal surgery',
+                prefixIcon: Icon(Icons.description_outlined),
+              ),
             ),
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () async {
               final name = nameCtrl.text.trim();
               if (name.isEmpty) return;
               Navigator.pop(ctx);
               final newSpec = SpecialtyModel(
-                id: 'spec_${name.toLowerCase().replaceAll(' ', '_')}',
+                id: 'spec_${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
                 name: name,
-                description: descCtrl.text.trim(),
-                iconName: 'healing',
+                description: descCtrl.text.trim().isEmpty
+                    ? 'Specialized clinical care and consultations'
+                    : descCtrl.text.trim(),
+                iconName: name.toLowerCase(),
+                activeDoctorCount: 0,
               );
               await ref.read(doctorRepositoryProvider).saveSpecialty(newSpec);
-              ref.invalidate(specialtiesProvider);
-              setState(() {});
             },
-            child: const Text('Add'),
+            style: ElevatedButton.styleFrom(minimumSize: const Size(110, 42)),
+            child: const Text('Create'),
           ),
         ],
       ),
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final user = ref.watch(currentUserProvider);
-    final doctorRepo = ref.watch(doctorRepositoryProvider);
-    final specialtiesAsync = ref.watch(specialtiesProvider);
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Text('Admin Desk • ${user?.displayName ?? "Admin"}'),
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Sign Out of Admin Desk?',
+          style: AppTypography.headline.copyWith(color: AppColors.textPrimaryOf(ctx)),
+        ),
+        content: Text(
+          'You will be returned to the login screen. Active platform locks and security rules remain enforced.',
+          style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondaryOf(ctx)),
+        ),
         actions: [
-          IconButton(
-            tooltip: 'Sign Out',
-            icon: const Icon(Icons.logout_rounded, color: AppColors.textSecondary),
-            onPressed: () async {
-              await ref.read(authRepositoryProvider).signOut();
-              ref.read(currentUserProvider.notifier).state = null;
-            },
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Stay Signed In'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              minimumSize: const Size(120, 42),
+            ),
+            child: const Text('Sign Out'),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Segmented Navigation Header
-          Container(
-            color: AppColors.surface,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                _NavButton(
-                  title: 'Verifications',
-                  icon: Icons.verified_user_outlined,
-                  isSelected: _tabIndex == 0,
-                  onTap: () => setState(() => _tabIndex = 0),
-                ),
-                const SizedBox(width: 8),
-                _NavButton(
-                  title: 'Analytics',
-                  icon: Icons.bar_chart_rounded,
-                  isSelected: _tabIndex == 1,
-                  onTap: () => setState(() => _tabIndex = 1),
-                ),
-                const SizedBox(width: 8),
-                _NavButton(
-                  title: 'Specialties',
-                  icon: Icons.category_outlined,
-                  isSelected: _tabIndex == 2,
-                  onTap: () => setState(() => _tabIndex = 2),
-                ),
-              ],
+    );
+
+    if (confirmed == true && mounted) {
+      await ref.read(authRepositoryProvider).signOut();
+      ref.read(currentUserProvider.notifier).state = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pendingAsync = ref.watch(pendingDoctorsProvider);
+    final analyticsAsync = ref.watch(adminAnalyticsProvider);
+    final specialtiesAsync = ref.watch(specialtiesProvider);
+
+    final pendingCount = pendingAsync.valueOrNull?.length ?? 0;
+
+    return Scaffold(
+      backgroundColor: AppColors.backgroundOf(context),
+      extendBody: true,
+      appBar: _buildContextualAppBar(
+        context,
+        pendingCount: pendingCount,
+        specialtyCount: specialtiesAsync.valueOrNull?.length ?? 0,
+      ),
+      body: SafeArea(
+        bottom: false,
+        child: IndexedStack(
+          index: _tabIndex,
+          children: [
+            // Tab 0: Verification Desk
+            AdminVerificationsScreen(
+              pendingAsync: pendingAsync,
+              analyticsAsync: analyticsAsync,
+              onApprove: _handleApproveDoctor,
+              onReject: _handleRejectDoctor,
+              scrollController: _scrollControllers[0],
+            ),
+
+            // Tab 1: Live Cloud Analytics
+            AdminAnalyticsScreen(
+              analyticsAsync: analyticsAsync,
+              specialtiesAsync: specialtiesAsync,
+              scrollController: _scrollControllers[1],
+            ),
+
+            // Tab 2: Medical Specialties Catalog
+            AdminSpecialtiesScreen(
+              specialtiesAsync: specialtiesAsync,
+              analyticsAsync: analyticsAsync,
+              onAddSpecialty: _showAddSpecialtyDialog,
+              scrollController: _scrollControllers[2],
+            ),
+
+            // Tab 3: Admin Profile & Settings
+            AdminSettingsScreen(
+              analyticsAsync: analyticsAsync,
+              onSignOut: _confirmSignOut,
+              scrollController: _scrollControllers[3],
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: AppBottomNavBar(
+        currentIndex: _tabIndex,
+        scrollControllers: _scrollControllers,
+        onTap: (idx) => setState(() => _tabIndex = idx),
+        items: [
+          AppNavItem(
+            label: 'Verifications',
+            icon: Icons.verified_user_outlined,
+            activeIcon: Icons.verified_user_rounded,
+            badgeCount: pendingCount,
+          ),
+          const AppNavItem(
+            label: 'Analytics',
+            icon: Icons.insights_outlined,
+            activeIcon: Icons.insights_rounded,
+          ),
+          const AppNavItem(
+            label: 'Specialties',
+            icon: Icons.grid_view_outlined,
+            activeIcon: Icons.grid_view_rounded,
+          ),
+          const AppNavItem(
+            label: 'Settings',
+            icon: Icons.manage_accounts_outlined,
+            activeIcon: Icons.manage_accounts_rounded,
+          ),
+        ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildContextualAppBar(
+    BuildContext context, {
+    required int pendingCount,
+    required int specialtyCount,
+  }) {
+    final surfaceColor = AppColors.surfaceOf(context);
+    final borderColor = AppColors.borderOf(context);
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textSecondary = AppColors.textSecondaryOf(context);
+
+    final (String title, String subtitle, Widget? trailing) = switch (_tabIndex) {
+      0 => (
+          'Doctor Verifications',
+          'Credential & Medical Board Review Queue',
+          _HeaderBadge(
+            icon: pendingCount > 0 ? Icons.pending_actions_rounded : Icons.check_circle_outline_rounded,
+            label: pendingCount > 0 ? '$pendingCount Pending' : 'Queue Clear',
+            color: pendingCount > 0 ? AppColors.warning : AppColors.success,
+            bgColor: pendingCount > 0
+                ? AppColors.warningLightOf(context)
+                : AppColors.successLightOf(context),
+          ),
+        ),
+      1 => (
+          'Platform Analytics',
+          'Appointments, Specialists & Patient Insights',
+          null,
+        ),
+      2 => (
+          'Medical Specialties',
+          '$specialtyCount Active Clinical Departments',
+          GestureDetector(
+            onTap: _showAddSpecialtyDialog,
+            child: Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Add',
+                    style: AppTypography.bodyMedium.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const Divider(height: 1, color: AppColors.border),
+        ),
+      _ => (
+          'Profile & Settings',
+          'Account Details & App Preferences',
+          null,
+        ),
+    };
 
-          Expanded(
-            child: IndexedStack(
-              index: _tabIndex,
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(72),
+      child: Container(
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+        ),
+        child: SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Row(
               children: [
-                // Tab 0: Verification Desk
-                FutureBuilder<List<DoctorModel>>(
-                  future: doctorRepo.getPendingVerificationDoctors(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    final pending = snapshot.data ?? [];
-
-                    if (pending.isEmpty) {
-                      return const EmptyStateView(
-                        icon: Icons.task_alt_rounded,
-                        title: 'Verification Queue Cleared',
-                        description: 'There are no pending doctor verification submissions awaiting review.',
-                      );
-                    }
-
-                    return ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: pending.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final doc = pending[index];
-                        return Card(
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(doc.doctorName, style: AppTypography.headline),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.warningLight,
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: Text(
-                                        'Pending Verification',
-                                        style: AppTypography.caption.copyWith(color: AppColors.warning, fontWeight: FontWeight.w700),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Specialty: ${doc.specialtyName} • Experience: ${doc.experienceYears} Years',
-                                  style: AppTypography.bodyMedium.copyWith(color: AppColors.primary),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Medical License No: ${doc.licenseNumber}',
-                                  style: AppTypography.caption.copyWith(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(doc.bio, style: AppTypography.bodyMedium),
-                                const Divider(height: 20, color: AppColors.border),
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.end,
-                                  children: [
-                                    OutlinedButton(
-                                      onPressed: () => _handleRejectDoctor(doc),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: AppColors.error,
-                                        side: const BorderSide(color: AppColors.error),
-                                        minimumSize: const Size(100, 38),
-                                      ),
-                                      child: const Text('Decline'),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    ElevatedButton(
-                                      onPressed: () => _handleApproveDoctor(doc),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: AppColors.success,
-                                        minimumSize: const Size(130, 38),
-                                      ),
-                                      child: const Text('Approve Doctor'),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-
-                // Tab 1: Platform Analytics
-                SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('Operational Metrics', style: AppTypography.headline),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _MetricCard(
-                            title: 'Total Patients',
-                            value: '148',
-                            subtitle: '+12 this week',
-                            color: AppColors.primary,
-                            icon: Icons.people_outline_rounded,
-                          ),
-                          const SizedBox(width: 12),
-                          _MetricCard(
-                            title: 'Verified Doctors',
-                            value: '24',
-                            subtitle: '3 specialties',
-                            color: AppColors.secondary,
-                            icon: Icons.medical_services_outlined,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          _MetricCard(
-                            title: 'Total Bookings',
-                            value: '412',
-                            subtitle: '94% fulfillment',
-                            color: AppColors.success,
-                            icon: Icons.calendar_month_outlined,
-                          ),
-                          const SizedBox(width: 12),
-                          _MetricCard(
-                            title: 'Cancellation Rate',
-                            value: '3.8%',
-                            subtitle: 'Under target (<5%)',
-                            color: AppColors.warning,
-                            icon: Icons.trending_down_rounded,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-
-                      const Text('System Reliability & Concurrency Guard', style: AppTypography.headline),
-                      const SizedBox(height: 10),
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
+                      Text(
+                        title,
+                        style: AppTypography.headline.copyWith(
+                          fontSize: 19,
+                          color: textPrimary,
                         ),
-                        child: Column(
-                          children: const [
-                            _SystemStatusRow(label: 'Deterministic Slot Transaction Lock', status: 'Active (Zero Double-Booking)'),
-                            Divider(height: 16, color: AppColors.border),
-                            _SystemStatusRow(label: 'Time-Zone UTC Normalization', status: 'Enforced'),
-                            Divider(height: 16, color: AppColors.border),
-                            _SystemStatusRow(label: 'State Machine Transition Validator', status: 'Enforced'),
-                            Divider(height: 16, color: AppColors.border),
-                            _SystemStatusRow(label: 'Offline Persistence Store', status: 'Synchronized'),
-                          ],
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: AppTypography.caption.copyWith(
+                          color: textSecondary,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
                   ),
                 ),
-
-                // Tab 2: Specialty Taxonomy
-                Scaffold(
-                  backgroundColor: Colors.transparent,
-                  floatingActionButton: FloatingActionButton.extended(
-                    onPressed: _showAddSpecialtyDialog,
-                    backgroundColor: AppColors.primary,
-                    icon: const Icon(Icons.add_rounded, color: Colors.white),
-                    label: const Text('Add Specialty', style: TextStyle(color: Colors.white)),
-                  ),
-                  body: specialtiesAsync.when(
-                    data: (specialties) {
-                      return ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: specialties.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final spec = specialties[index];
-                          return Card(
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: AppColors.primaryLight,
-                                child: const Icon(Icons.healing_rounded, color: AppColors.primary),
-                              ),
-                              title: Text(spec.name, style: AppTypography.headline.copyWith(fontSize: 16)),
-                              subtitle: Text(spec.description),
-                              trailing: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceVariant,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Text(
-                                  '${spec.activeDoctorCount} Docs',
-                                  style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      );
-                    },
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (e, _) => ErrorStateView(message: e.toString()),
-                  ),
-                ),
+                ?trailing,
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HeaderBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final Color bgColor;
+
+  const _HeaderBadge({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.bgColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: AppTypography.caption.copyWith(
+              color: color,
+              fontWeight: FontWeight.w700,
             ),
           ),
         ],
       ),
-    );
-  }
-}
-
-class _NavButton extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _NavButton({
-    required this.title,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? AppColors.primaryLight : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: isSelected ? AppColors.primary : AppColors.textSecondary),
-              const SizedBox(width: 6),
-              Text(
-                title,
-                style: AppTypography.caption.copyWith(
-                  color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MetricCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final String subtitle;
-  final Color color;
-  final IconData icon;
-
-  const _MetricCard({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.color,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(title, style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
-                Icon(icon, size: 20, color: color),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(value, style: AppTypography.display.copyWith(fontSize: 26, color: AppColors.textPrimary)),
-            const SizedBox(height: 4),
-            Text(subtitle, style: AppTypography.caption.copyWith(color: color, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SystemStatusRow extends StatelessWidget {
-  final String label;
-  final String status;
-
-  const _SystemStatusRow({required this.label, required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: AppTypography.bodyMedium),
-        Row(
-          children: [
-            const Icon(Icons.check_circle_rounded, size: 14, color: AppColors.success),
-            const SizedBox(width: 4),
-            Text(status, style: AppTypography.caption.copyWith(color: AppColors.success, fontWeight: FontWeight.w700)),
-          ],
-        ),
-      ],
     );
   }
 }
