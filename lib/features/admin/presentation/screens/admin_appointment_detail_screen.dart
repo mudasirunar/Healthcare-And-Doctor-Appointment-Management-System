@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
@@ -526,101 +527,123 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
   ) {
     final reasonController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    bool isProcessing = false;
 
     showDialog(
       context: context,
-      builder: (ctx) => AppDialog(
-        icon: Icons.cancel_outlined,
-        tone: AppDialogTone.destructive,
-        title: 'Cancel Consultation',
-        message:
-            'Are you sure you want to cancel this booking between ${appointment.patientName} and ${appointment.doctorName}? This releases the slot lock in the schedule.',
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Form(
-            key: formKey,
-            child: TextFormField(
-              controller: reasonController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: 'Cancellation Reason *',
-                hintText:
-                    'e.g., Doctor emergency reassignment, hospital maintenance...',
-                alignLabelWithHint: true,
+      barrierDismissible: !isProcessing,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AppDialog(
+          icon: Icons.cancel_outlined,
+          tone: AppDialogTone.destructive,
+          title: 'Cancel Consultation',
+          message:
+              'Are you sure you want to cancel this booking between ${appointment.patientName} and ${appointment.doctorName}? This releases the slot lock in the schedule.',
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Form(
+              key: formKey,
+              child: TextFormField(
+                controller: reasonController,
+                maxLines: 3,
+                enabled: !isProcessing,
+                decoration: const InputDecoration(
+                  labelText: 'Cancellation Reason *',
+                  hintText:
+                      'e.g., Doctor emergency reassignment, hospital maintenance...',
+                  alignLabelWithHint: true,
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Please provide a valid cancellation reason.';
+                  }
+                  return null;
+                },
               ),
-              validator: (val) {
-                if (val == null || val.trim().isEmpty) {
-                  return 'Please provide a valid cancellation reason.';
-                }
-                return null;
-              },
             ),
           ),
-        ),
-        cancelLabel: 'Dismiss',
-        onCancel: () => Navigator.pop(ctx),
-        confirmLabel: 'Cancel',
-        confirmIsDestructive: true,
-        onConfirm: () async {
-          if (!formKey.currentState!.validate()) return;
-          final reason = reasonController.text.trim();
-          Navigator.pop(ctx);
+          cancelLabel: 'Dismiss',
+          cancelIsEnabled: !isProcessing,
+          onCancel: () => Navigator.pop(ctx),
+          confirmLabel: 'Cancel',
+          confirmIsDestructive: true,
+          confirmIsLoading: isProcessing,
+          confirmIsEnabled: !isProcessing,
+          onConfirm: () async {
+            if (!formKey.currentState!.validate()) return;
+            final reason = reasonController.text.trim();
 
-          try {
-            final adminUser = ref.read(currentUserProvider);
-            await ref.read(appointmentRepositoryProvider).updateStatus(
-                  appointmentId: appointment.id,
-                  targetStatus: AppointmentStatus.cancelled,
-                  actorUserId: adminUser?.id ?? 'admin',
-                  isPatientActor: false,
-                  note: 'Admin Cancellation: $reason',
-                  cancellationReason: reason,
+            setDialogState(() => isProcessing = true);
+
+            try {
+              final adminUser = ref.read(currentUserProvider);
+              await ref.read(appointmentRepositoryProvider).updateStatus(
+                    appointmentId: appointment.id,
+                    targetStatus: AppointmentStatus.cancelled,
+                    actorUserId: adminUser?.id ?? 'admin',
+                    isPatientActor: false,
+                    note: 'Admin Cancellation: $reason',
+                    cancellationReason: reason,
+                  );
+
+              ref.invalidate(allAppointmentsAdminProvider);
+              ref.invalidate(userAppointmentsProvider);
+              ref.invalidate(adminAnalyticsProvider);
+
+              // Dismiss dialog immediately when database update succeeds
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+              }
+
+              // Show success feedback instantly without blocking
+              if (context.mounted) {
+                AppSnackBar.showSuccess(
+                  context,
+                  'Consultation cancelled by administration.',
                 );
+              }
 
-            ref.invalidate(allAppointmentsAdminProvider);
-            ref.invalidate(userAppointmentsProvider);
-            ref.invalidate(adminAnalyticsProvider);
+              // Fire notifications in the background asynchronously
+              final allDoctors =
+                  ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
+              final doctor = allDoctors
+                  .where((d) =>
+                      d.id == appointment.doctorId ||
+                      d.userId == appointment.doctorId)
+                  .firstOrNull;
+              final doctorUserId = doctor?.userId ?? appointment.doctorId;
 
-            final allDoctors =
-                ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
-            final doctor = allDoctors
-                .where((d) =>
-                    d.id == appointment.doctorId ||
-                    d.userId == appointment.doctorId)
-                .firstOrNull;
-            final doctorUserId = doctor?.userId ?? appointment.doctorId;
-
-            await UserNotificationService.instance.sendDoctorNotification(
-              doctorUserId: doctorUserId,
-              title: 'Consultation Cancelled by Administration',
-              body:
-                  'Consultation with ${appointment.patientName} was cancelled by Admin. Reason: $reason',
-              type: 'appointment_cancelled_by_admin',
-            );
-
-            await UserNotificationService.instance.sendPatientNotification(
-              patientUserId: appointment.patientId,
-              title: 'Consultation Cancelled by Administration',
-              body:
-                  'Your appointment with ${appointment.doctorName} was cancelled by Admin. Reason: $reason',
-              type: 'appointment_cancelled_by_admin',
-            );
-
-            if (context.mounted) {
-              AppSnackBar.showSuccess(
-                context,
-                'Consultation cancelled by administration.',
+              unawaited(
+                Future.wait([
+                  UserNotificationService.instance.sendDoctorNotification(
+                    doctorUserId: doctorUserId,
+                    title: 'Consultation Cancelled by Administration',
+                    body:
+                        'Consultation with ${appointment.patientName} was cancelled by Admin. Reason: $reason',
+                    type: 'appointment_cancelled_by_admin',
+                  ),
+                  UserNotificationService.instance.sendPatientNotification(
+                    patientUserId: appointment.patientId,
+                    title: 'Consultation Cancelled by Administration',
+                    body:
+                        'Your appointment with ${appointment.doctorName} was cancelled by Admin. Reason: $reason',
+                    type: 'appointment_cancelled_by_admin',
+                  ),
+                ]),
               );
+            } catch (e) {
+              if (ctx.mounted) {
+                setDialogState(() => isProcessing = false);
+              }
+              if (context.mounted) {
+                AppSnackBar.showError(
+                  context,
+                  'Failed to cancel consultation: $e',
+                );
+              }
             }
-          } catch (e) {
-            if (context.mounted) {
-              AppSnackBar.showError(
-                context,
-                'Failed to cancel consultation: $e',
-              );
-            }
-          }
-        },
+          },
+        ),
       ),
     );
   }
@@ -630,73 +653,91 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     AppointmentModel appointment,
   ) {
+    bool isProcessing = false;
+
     showDialog(
       context: context,
-      builder: (ctx) => AppDialog(
-        icon: Icons.check_circle_outline_rounded,
-        tone: AppDialogTone.success,
-        title: 'Confirm Consultation',
-        message:
-            'Confirm booking for ${appointment.patientName} with ${appointment.doctorName} on ${DateTimeUtils.formatFullWithTimeZone(appointment.scheduledTimeUtc)}?',
-        cancelLabel: 'Cancel',
-        onCancel: () => Navigator.pop(ctx),
-        confirmLabel: 'Confirm Booking',
-        onConfirm: () async {
-          Navigator.pop(ctx);
-          try {
-            final adminUser = ref.read(currentUserProvider);
-            await ref.read(appointmentRepositoryProvider).updateStatus(
-                  appointmentId: appointment.id,
-                  targetStatus: AppointmentStatus.confirmed,
-                  actorUserId: adminUser?.id ?? 'admin',
-                  isPatientActor: false,
-                  note: 'Confirmed by Administrator',
+      barrierDismissible: !isProcessing,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AppDialog(
+          icon: Icons.check_circle_outline_rounded,
+          tone: AppDialogTone.success,
+          title: 'Confirm Consultation',
+          message:
+              'Confirm booking for ${appointment.patientName} with ${appointment.doctorName} on ${DateTimeUtils.formatFullWithTimeZone(appointment.scheduledTimeUtc)}?',
+          cancelLabel: 'Cancel',
+          cancelIsEnabled: !isProcessing,
+          onCancel: () => Navigator.pop(ctx),
+          confirmLabel: 'Confirm Booking',
+          confirmIsLoading: isProcessing,
+          confirmIsEnabled: !isProcessing,
+          onConfirm: () async {
+            setDialogState(() => isProcessing = true);
+            try {
+              final adminUser = ref.read(currentUserProvider);
+              await ref.read(appointmentRepositoryProvider).updateStatus(
+                    appointmentId: appointment.id,
+                    targetStatus: AppointmentStatus.confirmed,
+                    actorUserId: adminUser?.id ?? 'admin',
+                    isPatientActor: false,
+                    note: 'Confirmed by Administrator',
+                  );
+
+              ref.invalidate(allAppointmentsAdminProvider);
+              ref.invalidate(userAppointmentsProvider);
+              ref.invalidate(adminAnalyticsProvider);
+
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+              }
+
+              if (context.mounted) {
+                AppSnackBar.showSuccess(
+                  context,
+                  'Consultation confirmed successfully.',
                 );
+              }
 
-            ref.invalidate(allAppointmentsAdminProvider);
-            ref.invalidate(userAppointmentsProvider);
-            ref.invalidate(adminAnalyticsProvider);
+              final allDoctors =
+                  ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
+              final doctor = allDoctors
+                  .where((d) =>
+                      d.id == appointment.doctorId ||
+                      d.userId == appointment.doctorId)
+                  .firstOrNull;
+              final doctorUserId = doctor?.userId ?? appointment.doctorId;
 
-            final allDoctors =
-                ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
-            final doctor = allDoctors
-                .where((d) =>
-                    d.id == appointment.doctorId ||
-                    d.userId == appointment.doctorId)
-                .firstOrNull;
-            final doctorUserId = doctor?.userId ?? appointment.doctorId;
-
-            await UserNotificationService.instance.sendDoctorNotification(
-              doctorUserId: doctorUserId,
-              title: 'Consultation Confirmed by Admin',
-              body:
-                  'Appointment with ${appointment.patientName} has been approved by administration.',
-              type: 'appointment_confirmed',
-            );
-
-            await UserNotificationService.instance.sendPatientNotification(
-              patientUserId: appointment.patientId,
-              title: 'Consultation Confirmed by Admin',
-              body:
-                  'Your appointment with ${appointment.doctorName} has been confirmed by administration.',
-              type: 'appointment_confirmed',
-            );
-
-            if (context.mounted) {
-              AppSnackBar.showSuccess(
-                context,
-                'Consultation confirmed successfully.',
+              unawaited(
+                Future.wait([
+                  UserNotificationService.instance.sendDoctorNotification(
+                    doctorUserId: doctorUserId,
+                    title: 'Consultation Confirmed by Admin',
+                    body:
+                        'Appointment with ${appointment.patientName} has been approved by administration.',
+                    type: 'appointment_confirmed',
+                  ),
+                  UserNotificationService.instance.sendPatientNotification(
+                    patientUserId: appointment.patientId,
+                    title: 'Consultation Confirmed by Admin',
+                    body:
+                        'Your appointment with ${appointment.doctorName} has been confirmed by administration.',
+                    type: 'appointment_confirmed',
+                  ),
+                ]),
               );
+            } catch (e) {
+              if (ctx.mounted) {
+                setDialogState(() => isProcessing = false);
+              }
+              if (context.mounted) {
+                AppSnackBar.showError(
+                  context,
+                  'Failed to confirm consultation: $e',
+                );
+              }
             }
-          } catch (e) {
-            if (context.mounted) {
-              AppSnackBar.showError(
-                context,
-                'Failed to confirm consultation: $e',
-              );
-            }
-          }
-        },
+          },
+        ),
       ),
     );
   }
@@ -706,73 +747,91 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
     WidgetRef ref,
     AppointmentModel appointment,
   ) {
+    bool isProcessing = false;
+
     showDialog(
       context: context,
-      builder: (ctx) => AppDialog(
-        icon: Icons.task_alt_rounded,
-        tone: AppDialogTone.primary,
-        title: 'Complete Consultation',
-        message:
-            'Mark consultation between ${appointment.patientName} and ${appointment.doctorName} as completed?',
-        cancelLabel: 'Cancel',
-        onCancel: () => Navigator.pop(ctx),
-        confirmLabel: 'Mark Completed',
-        onConfirm: () async {
-          Navigator.pop(ctx);
-          try {
-            final adminUser = ref.read(currentUserProvider);
-            await ref.read(appointmentRepositoryProvider).updateStatus(
-                  appointmentId: appointment.id,
-                  targetStatus: AppointmentStatus.completed,
-                  actorUserId: adminUser?.id ?? 'admin',
-                  isPatientActor: false,
-                  note: 'Marked completed by Administrator',
+      barrierDismissible: !isProcessing,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AppDialog(
+          icon: Icons.task_alt_rounded,
+          tone: AppDialogTone.primary,
+          title: 'Complete Consultation',
+          message:
+              'Mark consultation between ${appointment.patientName} and ${appointment.doctorName} as completed?',
+          cancelLabel: 'Cancel',
+          cancelIsEnabled: !isProcessing,
+          onCancel: () => Navigator.pop(ctx),
+          confirmLabel: 'Mark Completed',
+          confirmIsLoading: isProcessing,
+          confirmIsEnabled: !isProcessing,
+          onConfirm: () async {
+            setDialogState(() => isProcessing = true);
+            try {
+              final adminUser = ref.read(currentUserProvider);
+              await ref.read(appointmentRepositoryProvider).updateStatus(
+                    appointmentId: appointment.id,
+                    targetStatus: AppointmentStatus.completed,
+                    actorUserId: adminUser?.id ?? 'admin',
+                    isPatientActor: false,
+                    note: 'Marked completed by Administrator',
+                  );
+
+              ref.invalidate(allAppointmentsAdminProvider);
+              ref.invalidate(userAppointmentsProvider);
+              ref.invalidate(adminAnalyticsProvider);
+
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+              }
+
+              if (context.mounted) {
+                AppSnackBar.showSuccess(
+                  context,
+                  'Consultation marked as completed.',
                 );
+              }
 
-            ref.invalidate(allAppointmentsAdminProvider);
-            ref.invalidate(userAppointmentsProvider);
-            ref.invalidate(adminAnalyticsProvider);
+              final allDoctors =
+                  ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
+              final doctor = allDoctors
+                  .where((d) =>
+                      d.id == appointment.doctorId ||
+                      d.userId == appointment.doctorId)
+                  .firstOrNull;
+              final doctorUserId = doctor?.userId ?? appointment.doctorId;
 
-            final allDoctors =
-                ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
-            final doctor = allDoctors
-                .where((d) =>
-                    d.id == appointment.doctorId ||
-                    d.userId == appointment.doctorId)
-                .firstOrNull;
-            final doctorUserId = doctor?.userId ?? appointment.doctorId;
-
-            await UserNotificationService.instance.sendDoctorNotification(
-              doctorUserId: doctorUserId,
-              title: 'Consultation Completed',
-              body:
-                  'Appointment with ${appointment.patientName} was concluded and marked completed by administration.',
-              type: 'appointment_completed',
-            );
-
-            await UserNotificationService.instance.sendPatientNotification(
-              patientUserId: appointment.patientId,
-              title: 'Consultation Completed',
-              body:
-                  'Your consultation with ${appointment.doctorName} was marked completed by administration.',
-              type: 'appointment_completed',
-            );
-
-            if (context.mounted) {
-              AppSnackBar.showSuccess(
-                context,
-                'Consultation marked as completed.',
+              unawaited(
+                Future.wait([
+                  UserNotificationService.instance.sendDoctorNotification(
+                    doctorUserId: doctorUserId,
+                    title: 'Consultation Completed',
+                    body:
+                        'Appointment with ${appointment.patientName} was concluded and marked completed by administration.',
+                    type: 'appointment_completed',
+                  ),
+                  UserNotificationService.instance.sendPatientNotification(
+                    patientUserId: appointment.patientId,
+                    title: 'Consultation Completed',
+                    body:
+                        'Your consultation with ${appointment.doctorName} was marked completed by administration.',
+                    type: 'appointment_completed',
+                  ),
+                ]),
               );
+            } catch (e) {
+              if (ctx.mounted) {
+                setDialogState(() => isProcessing = false);
+              }
+              if (context.mounted) {
+                AppSnackBar.showError(
+                  context,
+                  'Failed to complete consultation: $e',
+                );
+              }
             }
-          } catch (e) {
-            if (context.mounted) {
-              AppSnackBar.showError(
-                context,
-                'Failed to complete consultation: $e',
-              );
-            }
-          }
-        },
+          },
+        ),
       ),
     );
   }

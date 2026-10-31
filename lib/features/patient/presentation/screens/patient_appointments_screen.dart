@@ -119,56 +119,73 @@ class _AppointmentsList extends ConsumerWidget {
     }
 
     final reasonController = TextEditingController();
+    bool isProcessing = false;
+
     showDialog(
       context: context,
-      builder: (ctx) => AppDialog(
-        icon: Icons.event_busy_rounded,
-        tone: AppDialogTone.destructive,
-        title: 'Cancel Appointment',
-        message:
-            'Are you sure you want to cancel your consultation with ${apt.doctorName}?',
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: TextField(
-            controller: reasonController,
-            decoration: const InputDecoration(
-              labelText: 'Reason for Cancellation (Required)',
-              hintText: 'e.g. Schedule conflict...',
+      barrierDismissible: !isProcessing,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AppDialog(
+          icon: Icons.event_busy_rounded,
+          tone: AppDialogTone.destructive,
+          title: 'Cancel Appointment',
+          message:
+              'Are you sure you want to cancel your consultation with ${apt.doctorName}?',
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: TextField(
+              controller: reasonController,
+              enabled: !isProcessing,
+              decoration: const InputDecoration(
+                labelText: 'Reason for Cancellation (Required)',
+                hintText: 'e.g. Schedule conflict...',
+              ),
             ),
           ),
-        ),
-        cancelLabel: 'Keep',
-        onCancel: () => Navigator.pop(ctx),
-        confirmLabel: 'Cancel',
-        confirmIsDestructive: true,
-        onConfirm: () async {
-          final reason = reasonController.text.trim();
-          if (reason.isEmpty) return;
-          Navigator.pop(ctx);
+          cancelLabel: 'Keep',
+          cancelIsEnabled: !isProcessing,
+          onCancel: () => Navigator.pop(ctx),
+          confirmLabel: 'Cancel',
+          confirmIsDestructive: true,
+          confirmIsLoading: isProcessing,
+          confirmIsEnabled: !isProcessing,
+          onConfirm: () async {
+            final reason = reasonController.text.trim();
+            if (reason.isEmpty) return;
 
-          try {
-            final user = ref.read(currentUserProvider);
-            await ref.read(appointmentRepositoryProvider).updateStatus(
-                  appointmentId: apt.id,
-                  targetStatus: AppointmentStatus.cancelled,
-                  actorUserId: user?.id ?? 'patient',
-                  isPatientActor: true,
-                  cancellationReason: reason,
+            setDialogState(() => isProcessing = true);
+
+            try {
+              final user = ref.read(currentUserProvider);
+              await ref.read(appointmentRepositoryProvider).updateStatus(
+                    appointmentId: apt.id,
+                    targetStatus: AppointmentStatus.cancelled,
+                    actorUserId: user?.id ?? 'patient',
+                    isPatientActor: true,
+                    cancellationReason: reason,
+                  );
+              ref.invalidate(userAppointmentsProvider);
+
+              if (ctx.mounted) {
+                Navigator.pop(ctx);
+              }
+
+              if (context.mounted) {
+                AppSnackBar.showInfo(
+                  context,
+                  'Appointment cancelled successfully.',
                 );
-            ref.invalidate(userAppointmentsProvider);
-
-            if (context.mounted) {
-              AppSnackBar.showInfo(
-                context,
-                'Appointment cancelled successfully.',
-              );
+              }
+            } catch (e) {
+              if (ctx.mounted) {
+                setDialogState(() => isProcessing = false);
+              }
+              if (context.mounted) {
+                AppSnackBar.showError(context, e.toString());
+              }
             }
-          } catch (e) {
-            if (context.mounted) {
-              AppSnackBar.showError(context, e.toString());
-            }
-          }
-        },
+          },
+        ),
       ),
     );
   }
