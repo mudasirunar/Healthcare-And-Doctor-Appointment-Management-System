@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/smart_search_utils.dart';
 import '../../../../core/widgets/app_search_bar.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../doctor/domain/entities/specialty_model.dart';
 import '../../domain/entities/admin_analytics_model.dart';
@@ -116,9 +117,188 @@ void showAddSpecialtyDialog(BuildContext context, WidgetRef ref) {
               activeDoctorCount: 0,
             );
             await ref.read(doctorRepositoryProvider).saveSpecialty(newSpec);
+            if (context.mounted) {
+              AppSnackBar.showSuccess(
+                context,
+                '${newSpec.name} department created.',
+              );
+            }
           },
           style: ElevatedButton.styleFrom(minimumSize: const Size(110, 42)),
           child: const Text('Create'),
+        ),
+      ],
+    ),
+  );
+}
+
+void showEditSpecialtyDialog(
+  BuildContext context,
+  WidgetRef ref,
+  SpecialtyModel spec,
+) {
+  final nameCtrl = TextEditingController(text: spec.name);
+  final descCtrl = TextEditingController(text: spec.description);
+
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(
+        'Edit Department',
+        style: AppTypography.headline.copyWith(
+          color: AppColors.textPrimaryOf(ctx),
+        ),
+      ),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: nameCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Department Name',
+              prefixIcon: Icon(Icons.medical_information_outlined),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: descCtrl,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'Clinical Scope & Description',
+              prefixIcon: Icon(Icons.description_outlined),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            final name = nameCtrl.text.trim();
+            if (name.isEmpty) return;
+            Navigator.pop(ctx);
+            final updated = spec.copyWith(
+              name: name,
+              description: descCtrl.text.trim().isEmpty
+                  ? spec.description
+                  : descCtrl.text.trim(),
+            );
+            await ref.read(doctorRepositoryProvider).saveSpecialty(updated);
+            if (context.mounted) {
+              AppSnackBar.showSuccess(
+                context,
+                '${spec.name} department updated.',
+              );
+            }
+          },
+          style: ElevatedButton.styleFrom(minimumSize: const Size(100, 42)),
+          child: const Text('Save'),
+        ),
+      ],
+    ),
+  );
+}
+
+void handleDeleteSpecialty(
+  BuildContext context,
+  WidgetRef ref,
+  SpecialtyModel spec, {
+  VoidCallback? onDeleted,
+}) {
+  final allDocs = ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
+  final assignedDoctors =
+      allDocs.where((d) => d.specialtyId == spec.id).toList();
+
+  if (assignedDoctors.isNotEmpty) {
+    // Option 2 Guardrail: BLOCK DELETION and show alert with "View Specialists" shortcut
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.warning),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Department In Use',
+                style: AppTypography.headline.copyWith(
+                  color: AppColors.textPrimaryOf(ctx),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Cannot delete "${spec.name}" because ${assignedDoctors.length} specialist(s) are currently assigned to this department.\n\nPlease reassign or remove these specialists before deleting this department.',
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textSecondaryOf(ctx),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Dismiss'),
+          ),
+          if (onDeleted == null)
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        AdminSpecialtyDoctorsScreen(specialty: spec),
+                  ),
+                );
+              },
+              child: const Text('View Specialists'),
+            ),
+        ],
+      ),
+    );
+    return;
+  }
+
+  // 0 doctors assigned: allow deletion
+  showDialog(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: Text(
+        'Delete Department?',
+        style: AppTypography.headline.copyWith(
+          color: AppColors.textPrimaryOf(ctx),
+        ),
+      ),
+      content: Text(
+        'Are you sure you want to delete "${spec.name}"? This department will be permanently removed.',
+        style: AppTypography.bodyMedium.copyWith(
+          color: AppColors.textSecondaryOf(ctx),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(ctx),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            await ref.read(doctorRepositoryProvider).deleteSpecialty(spec.id);
+            if (context.mounted) {
+              AppSnackBar.showSuccess(
+                context,
+                '${spec.name} department deleted.',
+              );
+              onDeleted?.call();
+            }
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.error,
+          ),
+          child: const Text('Delete'),
         ),
       ],
     ),
@@ -318,11 +498,49 @@ class _AdminSpecialtiesScreenState
                               ],
                             ),
                           ),
-                          const SizedBox(width: 6),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            color: AppColors.textSecondaryOf(context),
-                            size: 20,
+                          PopupMenuButton<String>(
+                            icon: Icon(
+                              Icons.more_vert_rounded,
+                              color: AppColors.textSecondaryOf(context),
+                              size: 20,
+                            ),
+                            padding: EdgeInsets.zero,
+                            onSelected: (action) {
+                              if (action == 'edit') {
+                                showEditSpecialtyDialog(context, ref, spec);
+                              } else if (action == 'delete') {
+                                handleDeleteSpecialty(context, ref, spec);
+                              }
+                            },
+                            itemBuilder: (ctx) => [
+                              const PopupMenuItem(
+                                value: 'edit',
+                                child: Row(
+                                  children: [
+                                    Icon(Icons.edit_outlined, size: 18),
+                                    SizedBox(width: 10),
+                                    Text('Edit Department'),
+                                  ],
+                                ),
+                              ),
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.delete_outline_rounded,
+                                      size: 18,
+                                      color: AppColors.error,
+                                    ),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Delete Department',
+                                      style: TextStyle(color: AppColors.error),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

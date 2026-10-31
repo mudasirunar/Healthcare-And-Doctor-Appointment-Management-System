@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/user_notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
@@ -9,6 +10,7 @@ import '../../../../core/widgets/status_badge.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import 'admin_appointment_detail_screen.dart';
+import 'admin_edit_doctor_screen.dart';
 
 class AdminDoctorDetailScreen extends ConsumerWidget {
   final String doctorId;
@@ -40,6 +42,166 @@ class AdminDoctorDetailScreen extends ConsumerWidget {
         .read(doctorRepositoryProvider)
         .updateVerificationStatus(doctor.id, status, notes);
     ref.invalidate(filteredDoctorsProvider);
+  }
+
+  void _showQuickReassignSpecialtyDialog(
+    BuildContext context,
+    WidgetRef ref,
+    DoctorModel doctor,
+  ) {
+    final specialties = ref.read(specialtiesProvider).valueOrNull ?? [];
+    if (specialties.isEmpty) return;
+    String selectedId = doctor.specialtyId;
+    String selectedName = doctor.specialtyName;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => AlertDialog(
+          title: Text(
+            'Reassign Department',
+            style: AppTypography.headline.copyWith(
+              color: AppColors.textPrimaryOf(ctx),
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Select new medical department for Dr. ${doctor.doctorName}:',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondaryOf(ctx),
+                ),
+              ),
+              const SizedBox(height: 14),
+              DropdownButtonFormField<String>(
+                value: specialties.any((s) => s.id == selectedId)
+                    ? selectedId
+                    : specialties.first.id,
+                decoration: const InputDecoration(
+                  labelText: 'Department',
+                  prefixIcon: Icon(Icons.grid_view_rounded),
+                ),
+                items: specialties.map((s) {
+                  return DropdownMenuItem<String>(
+                    value: s.id,
+                    child: Text(s.name),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    final matched = specialties.firstWhere((s) => s.id == val);
+                    setModalState(() {
+                      selectedId = matched.id;
+                      selectedName = matched.name;
+                    });
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                final updated = doctor.copyWith(
+                  specialtyId: selectedId,
+                  specialtyName: selectedName,
+                );
+                await ref
+                    .read(doctorRepositoryProvider)
+                    .updateDoctorProfile(updated);
+                ref.invalidate(allDoctorsAdminProvider);
+                ref.invalidate(filteredDoctorsProvider);
+
+                UserNotificationService.instance.sendDoctorNotification(
+                  doctorUserId: doctor.userId,
+                  title: 'Specialty Department Reassigned',
+                  body:
+                      'Hospital administration reassigned your specialty to $selectedName.',
+                  type: 'specialty_reassigned',
+                );
+
+                if (context.mounted) {
+                  AppSnackBar.showSuccess(
+                    context,
+                    'Dr. ${doctor.doctorName} reassigned to $selectedName.',
+                  );
+                }
+              },
+              child: const Text('Reassign'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _confirmDeleteDoctor(
+    BuildContext context,
+    WidgetRef ref,
+    DoctorModel doctor,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.error),
+            const SizedBox(width: 8),
+            Text(
+              'Remove Doctor?',
+              style: AppTypography.headline.copyWith(
+                color: AppColors.textPrimaryOf(ctx),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to remove Dr. ${doctor.doctorName} (License: ${doctor.licenseNumber}) from the hospital registry? All active slot registrations will be removed.',
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textSecondaryOf(ctx),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref.read(doctorRepositoryProvider).deleteDoctor(doctor.id);
+              ref.invalidate(allDoctorsAdminProvider);
+              ref.invalidate(filteredDoctorsProvider);
+
+              UserNotificationService.instance.sendDoctorNotification(
+                doctorUserId: doctor.userId,
+                title: 'Account Removed from Registry',
+                body:
+                    'Your specialist profile was removed from the active directory by hospital administration.',
+                type: 'doctor_removed',
+              );
+
+              if (context.mounted) {
+                AppSnackBar.showSuccess(
+                  context,
+                  'Dr. ${doctor.doctorName} removed from registry.',
+                );
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Remove Doctor'),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showRejectDialog(
@@ -146,6 +308,76 @@ class AdminDoctorDetailScreen extends ConsumerWidget {
       backgroundColor: AppColors.backgroundOf(context),
       appBar: AppBar(
         title: const Text('Specialist Profile'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit Specialist',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AdminEditDoctorScreen(doctor: doctor),
+                ),
+              );
+            },
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (action) {
+              if (action == 'edit') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AdminEditDoctorScreen(doctor: doctor),
+                  ),
+                );
+              } else if (action == 'reassign') {
+                _showQuickReassignSpecialtyDialog(context, ref, doctor);
+              } else if (action == 'delete') {
+                _confirmDeleteDoctor(context, ref, doctor);
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 18),
+                    SizedBox(width: 10),
+                    Text('Edit Profile'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'reassign',
+                child: Row(
+                  children: [
+                    Icon(Icons.swap_horiz_rounded, size: 18),
+                    SizedBox(width: 10),
+                    Text('Change Department'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.delete_outline_rounded,
+                      size: 18,
+                      color: AppColors.error,
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Remove from Registry',
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 40),
@@ -548,6 +780,24 @@ class AdminDoctorDetailScreen extends ConsumerWidget {
                 ],
               );
             }),
+
+          // Remove Specialist Action Button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            child: OutlinedButton.icon(
+              onPressed: () => _confirmDeleteDoctor(context, ref, doctor),
+              icon: const Icon(Icons.delete_outline_rounded, size: 20),
+              label: const Text('Remove Specialist from Registry'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error, width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

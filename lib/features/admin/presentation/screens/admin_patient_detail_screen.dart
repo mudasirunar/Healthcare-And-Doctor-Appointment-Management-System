@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/user_notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
+import '../../../auth/domain/entities/user_model.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
 import 'admin_appointment_detail_screen.dart';
 import 'admin_doctor_detail_screen.dart';
+import 'admin_edit_patient_screen.dart';
 
 class AdminPatientDetailScreen extends ConsumerWidget {
   final String patientId;
@@ -16,6 +20,69 @@ class AdminPatientDetailScreen extends ConsumerWidget {
     super.key,
     required this.patientId,
   });
+
+  void _confirmDeletePatient(
+    BuildContext context,
+    WidgetRef ref,
+    UserModel patient,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: AppColors.error),
+            const SizedBox(width: 8),
+            Text(
+              'Remove Patient?',
+              style: AppTypography.headline.copyWith(
+                color: AppColors.textPrimaryOf(ctx),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to remove ${patient.displayName} from hospital records? This action cannot be undone.',
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textSecondaryOf(ctx),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              await ref
+                  .read(authRepositoryProvider)
+                  .deletePatientRecord(patient.id);
+              ref.invalidate(allPatientsAdminProvider);
+
+              UserNotificationService.instance.sendPatientNotification(
+                patientUserId: patient.id,
+                title: 'Account Record Removed',
+                body:
+                    'Your patient profile was removed from hospital records by administration.',
+                type: 'patient_removed',
+              );
+
+              if (context.mounted) {
+                AppSnackBar.showSuccess(
+                  context,
+                  'Patient ${patient.displayName} removed from records.',
+                );
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Remove Patient'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -56,6 +123,64 @@ class AdminPatientDetailScreen extends ConsumerWidget {
       backgroundColor: AppColors.backgroundOf(context),
       appBar: AppBar(
         title: const Text('Patient Profile & Records'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit Records',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => AdminEditPatientScreen(patient: patient),
+                ),
+              );
+            },
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (action) {
+              if (action == 'edit') {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => AdminEditPatientScreen(patient: patient),
+                  ),
+                );
+              } else if (action == 'delete') {
+                _confirmDeletePatient(context, ref, patient);
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'edit',
+                child: Row(
+                  children: [
+                    Icon(Icons.edit_outlined, size: 18),
+                    SizedBox(width: 10),
+                    Text('Edit Patient Profile'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'delete',
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.delete_outline_rounded,
+                      size: 18,
+                      color: AppColors.error,
+                    ),
+                    SizedBox(width: 10),
+                    Text(
+                      'Remove from Records',
+                      style: TextStyle(color: AppColors.error),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 40),
@@ -481,6 +606,24 @@ class AdminPatientDetailScreen extends ConsumerWidget {
                 ],
               );
             }),
+
+          // Danger Remove Patient Button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+            child: OutlinedButton.icon(
+              onPressed: () => _confirmDeletePatient(context, ref, patient),
+              icon: const Icon(Icons.delete_outline_rounded, size: 20),
+              label: const Text('Remove Patient from Hospital Records'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.error,
+                side: const BorderSide(color: AppColors.error, width: 1.5),
+                padding: const EdgeInsets.symmetric(vertical: 15),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

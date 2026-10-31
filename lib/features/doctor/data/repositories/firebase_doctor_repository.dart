@@ -135,6 +135,24 @@ class FirebaseDoctorRepository implements DoctorRepository {
   }
 
   @override
+  Future<void> updateDoctorProfile(DoctorModel doctor) async {
+    await _firestore
+        .collection('doctors')
+        .doc(doctor.id)
+        .set(doctor.toMap(), SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> deleteDoctor(String doctorId) async {
+    await _firestore.collection('doctors').doc(doctorId).delete();
+  }
+
+  @override
+  Future<void> deleteSpecialty(String specialtyId) async {
+    await _firestore.collection('specialties').doc(specialtyId).delete();
+  }
+
+  @override
   Stream<List<DoctorModel>> watchDoctors() {
     return _firestore
         .collection('doctors')

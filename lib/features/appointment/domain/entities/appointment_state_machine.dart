@@ -19,6 +19,7 @@ class AppointmentStateMachine {
     },
     AppointmentStatus.inProgress: {
       AppointmentStatus.completed,
+      AppointmentStatus.cancelled,
     },
     AppointmentStatus.completed: {},
     AppointmentStatus.cancelled: {},

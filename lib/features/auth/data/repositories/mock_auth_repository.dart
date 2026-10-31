@@ -102,4 +102,18 @@ class MockAuthRepository implements AuthRepository {
     }
     return user;
   }
+
+  @override
+  Future<UserModel> registerPatientByAdmin({
+    required UserModel patient,
+    required String password,
+  }) async {
+    await _dataStore.saveUser(patient);
+    return patient;
+  }
+
+  @override
+  Future<void> deletePatientRecord(String userId) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
 }

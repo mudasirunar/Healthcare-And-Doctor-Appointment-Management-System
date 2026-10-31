@@ -11,6 +11,7 @@ import '../../../auth/domain/entities/user_model.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import 'admin_doctor_detail_screen.dart';
 import 'admin_patient_detail_screen.dart';
+import 'admin_register_patient_screen.dart';
 
 enum AdminDirectorySegment { doctors, patients }
 
@@ -250,6 +251,7 @@ class _AdminDirectoryScreenState extends ConsumerState<AdminDirectoryScreen> {
     final appointments =
         ref.watch(allAppointmentsAdminProvider).valueOrNull ?? [];
 
+    final isDark = AppColors.isDark(context);
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
     final borderColor = AppColors.borderOf(context);
@@ -348,6 +350,56 @@ class _AdminDirectoryScreenState extends ConsumerState<AdminDirectoryScreen> {
                                     ),
                                   ),
                                 ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                  if (segment == AdminDirectorySegment.patients) ...[
+                    const SizedBox(width: 10),
+                    Tooltip(
+                      message: 'Register New Patient',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  const AdminRegisterPatientScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          height: 46,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary.withValues(
+                              alpha: isDark ? 0.20 : 0.14,
+                            ),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color:
+                                  AppColors.secondary.withValues(alpha: 0.35),
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.person_add_alt_1_rounded,
+                                size: 19,
+                                color: AppColors.secondary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Add',
+                                style: AppTypography.bodyMedium.copyWith(
+                                  color: AppColors.secondary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
                             ],
                           ),
                         ),

@@ -18,5 +18,8 @@ abstract class DoctorRepository {
   Future<void> updateVerificationStatus(String doctorId, VerificationStatus status, [String? notes]);
   Future<void> updateDoctorAvailability(String doctorId, Map<String, List<TimeWindow>> weeklyAvailability, List<String> blackoutDates);
   Future<void> registerDoctorProfile(DoctorModel doctor);
+  Future<void> updateDoctorProfile(DoctorModel doctor);
+  Future<void> deleteDoctor(String doctorId);
+  Future<void> deleteSpecialty(String specialtyId);
   Stream<List<DoctorModel>> watchDoctors();
 }

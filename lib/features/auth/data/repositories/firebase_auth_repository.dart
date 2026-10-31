@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../../../../core/errors/app_exceptions.dart';
 import '../../domain/entities/user_model.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -159,6 +160,62 @@ class FirebaseAuthRepository implements AuthRepository {
     updatedMap['updatedAt'] = DateTime.now().toUtc().toIso8601String();
     await _firestore.collection('users').doc(user.id).update(updatedMap);
     return user;
+  }
+
+  @override
+  Future<UserModel> registerPatientByAdmin({
+    required UserModel patient,
+    required String password,
+  }) async {
+    FirebaseApp? secondaryApp;
+    try {
+      final appName =
+          'PatientAdminApp_${DateTime.now().microsecondsSinceEpoch}';
+      secondaryApp = await Firebase.initializeApp(
+        name: appName,
+        options: Firebase.app().options,
+      );
+
+      final secondaryAuth = FirebaseAuth.instanceFor(app: secondaryApp);
+      final credential = await secondaryAuth.createUserWithEmailAndPassword(
+        email: patient.email.trim(),
+        password: password.trim(),
+      );
+
+      final user = credential.user;
+      if (user == null) {
+        throw const AuthException('Failed to create patient account.');
+      }
+
+      await user.updateDisplayName(patient.displayName);
+
+      final nowIso = DateTime.now().toUtc().toIso8601String();
+      final createdPatient = patient.copyWith(
+        id: user.uid,
+        createdAt: nowIso,
+        updatedAt: nowIso,
+      );
+
+      await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .set(createdPatient.toMap());
+
+      return createdPatient;
+    } on FirebaseAuthException catch (e) {
+      throw AuthException(_mapFirebaseAuthError(e));
+    } catch (e) {
+      throw AuthException(e.toString());
+    } finally {
+      if (secondaryApp != null) {
+        await secondaryApp.delete();
+      }
+    }
+  }
+
+  @override
+  Future<void> deletePatientRecord(String userId) async {
+    await _firestore.collection('users').doc(userId).delete();
   }
 
   String _mapFirebaseAuthError(FirebaseAuthException e) {

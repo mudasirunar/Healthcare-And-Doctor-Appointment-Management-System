@@ -93,6 +93,21 @@ class MockDoctorRepository implements DoctorRepository {
   }
 
   @override
+  Future<void> updateDoctorProfile(DoctorModel doctor) async {
+    await _dataStore.updateDoctor(doctor);
+  }
+
+  @override
+  Future<void> deleteDoctor(String doctorId) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
+
+  @override
+  Future<void> deleteSpecialty(String specialtyId) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
+
+  @override
   Stream<List<DoctorModel>> watchDoctors() {
     return _dataStore.doctorsStream;
   }

@@ -9,6 +9,7 @@ import '../../../../core/widgets/state_views.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import '../../../doctor/domain/entities/specialty_model.dart';
 import 'admin_doctor_detail_screen.dart';
+import 'admin_specialties_screen.dart';
 
 class AdminSpecialtyDoctorsScreen extends ConsumerStatefulWidget {
   final SpecialtyModel specialty;
@@ -37,7 +38,11 @@ class _AdminSpecialtyDoctorsScreenState
   @override
   Widget build(BuildContext context) {
     final doctorsAsync = ref.watch(allDoctorsAdminProvider);
-    final spec = widget.specialty;
+    final allSpecialties = ref.watch(specialtiesProvider).valueOrNull ?? [];
+    final spec = allSpecialties
+            .where((s) => s.id == widget.specialty.id)
+            .firstOrNull ??
+        widget.specialty;
     final accent = spec.accentColor;
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
@@ -47,6 +52,30 @@ class _AdminSpecialtyDoctorsScreenState
       backgroundColor: AppColors.backgroundOf(context),
       appBar: AppBar(
         title: Text(spec.name),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.edit_outlined),
+            tooltip: 'Edit Department',
+            onPressed: () => showEditSpecialtyDialog(context, ref, spec),
+          ),
+          IconButton(
+            icon: const Icon(
+              Icons.delete_outline_rounded,
+              color: AppColors.error,
+            ),
+            tooltip: 'Delete Department',
+            onPressed: () => handleDeleteSpecialty(
+              context,
+              ref,
+              spec,
+              onDeleted: () {
+                if (context.mounted) {
+                  Navigator.pop(context);
+                }
+              },
+            ),
+          ),
+        ],
       ),
       body: doctorsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),

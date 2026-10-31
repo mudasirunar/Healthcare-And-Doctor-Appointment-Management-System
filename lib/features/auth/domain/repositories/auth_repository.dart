@@ -23,4 +23,9 @@ abstract class AuthRepository {
 
   Future<void> signOut();
   Future<UserModel> updateProfile(UserModel user);
+  Future<UserModel> registerPatientByAdmin({
+    required UserModel patient,
+    required String password,
+  });
+  Future<void> deletePatientRecord(String userId);
 }

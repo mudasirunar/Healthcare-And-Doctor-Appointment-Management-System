@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/user_notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
+import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
 import 'admin_doctor_detail_screen.dart';
 import 'admin_patient_detail_screen.dart';
@@ -43,6 +46,67 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
       backgroundColor: AppColors.backgroundOf(context),
       appBar: AppBar(
         title: const Text('Appointment Details'),
+        actions: [
+          if (!appointment.status.isTerminal)
+            PopupMenuButton<String>(
+              icon: const Icon(Icons.more_vert_rounded),
+              onSelected: (val) {
+                if (val == 'cancel') {
+                  _showCancelDialog(context, ref, appointment);
+                } else if (val == 'confirm') {
+                  _confirmAppointment(context, ref, appointment);
+                } else if (val == 'complete') {
+                  _completeAppointment(context, ref, appointment);
+                }
+              },
+              itemBuilder: (ctx) => [
+                if (appointment.status == AppointmentStatus.requested)
+                  const PopupMenuItem(
+                    value: 'confirm',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline_rounded,
+                          color: AppColors.success,
+                          size: 20,
+                        ),
+                        SizedBox(width: 10),
+                        Text('Confirm Booking'),
+                      ],
+                    ),
+                  ),
+                if (appointment.status == AppointmentStatus.inProgress)
+                  const PopupMenuItem(
+                    value: 'complete',
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.task_alt_rounded,
+                          color: AppColors.primary,
+                          size: 20,
+                        ),
+                        SizedBox(width: 10),
+                        Text('Complete Consultation'),
+                      ],
+                    ),
+                  ),
+                const PopupMenuItem(
+                  value: 'cancel',
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.cancel_outlined,
+                        color: AppColors.error,
+                        size: 20,
+                      ),
+                      SizedBox(width: 10),
+                      Text('Cancel Consultation (Admin)'),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+        ],
       ),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 40),
@@ -382,6 +446,371 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
               );
             }),
           ],
+
+          // 6. Administrative Actions (when not in a terminal state)
+          if (!appointment.status.isTerminal) ...[
+            const SizedBox(height: 16),
+            Divider(height: 1, color: borderColor),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+              child: Text(
+                'Administrative Actions',
+                style: AppTypography.headline.copyWith(color: textPrimary),
+              ),
+            ),
+            if (appointment.status == AppointmentStatus.requested)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: ElevatedButton.icon(
+                  onPressed: () => _confirmAppointment(context, ref, appointment),
+                  icon: const Icon(Icons.check_circle_outline_rounded, size: 20),
+                  label: const Text('Confirm Consultation Booking'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            if (appointment.status == AppointmentStatus.inProgress)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                child: ElevatedButton.icon(
+                  onPressed: () => _completeAppointment(context, ref, appointment),
+                  icon: const Icon(Icons.task_alt_rounded, size: 20),
+                  label: const Text('Mark Consultation as Completed'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              child: OutlinedButton.icon(
+                onPressed: () => _showCancelDialog(context, ref, appointment),
+                icon: const Icon(
+                  Icons.cancel_outlined,
+                  color: AppColors.error,
+                  size: 20,
+                ),
+                label: const Text('Cancel Consultation (Admin Action)'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _showCancelDialog(
+    BuildContext context,
+    WidgetRef ref,
+    AppointmentModel appointment,
+  ) {
+    final reasonController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Consultation'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Are you sure you want to cancel this booking between ${appointment.patientName} and ${appointment.doctorName}? This releases the slot lock in the schedule.',
+                style: AppTypography.bodyMedium.copyWith(
+                  color: AppColors.textSecondaryOf(context),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: reasonController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Cancellation Reason *',
+                  hintText:
+                      'e.g., Doctor emergency reassignment, hospital maintenance...',
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
+                validator: (val) {
+                  if (val == null || val.trim().isEmpty) {
+                    return 'Please provide a valid cancellation reason.';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Dismiss'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              final reason = reasonController.text.trim();
+              Navigator.pop(ctx);
+
+              try {
+                final adminUser = ref.read(currentUserProvider);
+                await ref.read(appointmentRepositoryProvider).updateStatus(
+                      appointmentId: appointment.id,
+                      targetStatus: AppointmentStatus.cancelled,
+                      actorUserId: adminUser?.id ?? 'admin',
+                      isPatientActor: false,
+                      note: 'Admin Cancellation: $reason',
+                      cancellationReason: reason,
+                    );
+
+                ref.invalidate(allAppointmentsAdminProvider);
+                ref.invalidate(userAppointmentsProvider);
+                ref.invalidate(adminAnalyticsProvider);
+
+                final allDoctors =
+                    ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
+                final doctor = allDoctors
+                    .where((d) =>
+                        d.id == appointment.doctorId ||
+                        d.userId == appointment.doctorId)
+                    .firstOrNull;
+                final doctorUserId = doctor?.userId ?? appointment.doctorId;
+
+                await UserNotificationService.instance.sendDoctorNotification(
+                  doctorUserId: doctorUserId,
+                  title: 'Consultation Cancelled by Administration',
+                  body:
+                      'Consultation with ${appointment.patientName} was cancelled by Admin. Reason: $reason',
+                  type: 'appointment_cancelled_by_admin',
+                );
+
+                await UserNotificationService.instance.sendPatientNotification(
+                  patientUserId: appointment.patientId,
+                  title: 'Consultation Cancelled by Administration',
+                  body:
+                      'Your appointment with ${appointment.doctorName} was cancelled by Admin. Reason: $reason',
+                  type: 'appointment_cancelled_by_admin',
+                );
+
+                if (context.mounted) {
+                  AppSnackBar.showSuccess(
+                    context,
+                    'Consultation cancelled by administration.',
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  AppSnackBar.showError(
+                    context,
+                    'Failed to cancel consultation: $e',
+                  );
+                }
+              }
+            },
+            child: const Text('Confirm Cancellation'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmAppointment(
+    BuildContext context,
+    WidgetRef ref,
+    AppointmentModel appointment,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Consultation'),
+        content: Text(
+          'Confirm booking for ${appointment.patientName} with ${appointment.doctorName} on ${DateTimeUtils.formatFullWithTimeZone(appointment.scheduledTimeUtc)}?',
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textSecondaryOf(context),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final adminUser = ref.read(currentUserProvider);
+                await ref.read(appointmentRepositoryProvider).updateStatus(
+                      appointmentId: appointment.id,
+                      targetStatus: AppointmentStatus.confirmed,
+                      actorUserId: adminUser?.id ?? 'admin',
+                      isPatientActor: false,
+                      note: 'Confirmed by Administrator',
+                    );
+
+                ref.invalidate(allAppointmentsAdminProvider);
+                ref.invalidate(userAppointmentsProvider);
+                ref.invalidate(adminAnalyticsProvider);
+
+                final allDoctors =
+                    ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
+                final doctor = allDoctors
+                    .where((d) =>
+                        d.id == appointment.doctorId ||
+                        d.userId == appointment.doctorId)
+                    .firstOrNull;
+                final doctorUserId = doctor?.userId ?? appointment.doctorId;
+
+                await UserNotificationService.instance.sendDoctorNotification(
+                  doctorUserId: doctorUserId,
+                  title: 'Consultation Confirmed by Admin',
+                  body:
+                      'Appointment with ${appointment.patientName} has been approved by administration.',
+                  type: 'appointment_confirmed',
+                );
+
+                await UserNotificationService.instance.sendPatientNotification(
+                  patientUserId: appointment.patientId,
+                  title: 'Consultation Confirmed by Admin',
+                  body:
+                      'Your appointment with ${appointment.doctorName} has been confirmed by administration.',
+                  type: 'appointment_confirmed',
+                );
+
+                if (context.mounted) {
+                  AppSnackBar.showSuccess(
+                    context,
+                    'Consultation confirmed successfully.',
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  AppSnackBar.showError(
+                    context,
+                    'Failed to confirm consultation: $e',
+                  );
+                }
+              }
+            },
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _completeAppointment(
+    BuildContext context,
+    WidgetRef ref,
+    AppointmentModel appointment,
+  ) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Complete Consultation'),
+        content: Text(
+          'Mark consultation between ${appointment.patientName} and ${appointment.doctorName} as completed?',
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textSecondaryOf(context),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                final adminUser = ref.read(currentUserProvider);
+                await ref.read(appointmentRepositoryProvider).updateStatus(
+                      appointmentId: appointment.id,
+                      targetStatus: AppointmentStatus.completed,
+                      actorUserId: adminUser?.id ?? 'admin',
+                      isPatientActor: false,
+                      note: 'Marked completed by Administrator',
+                    );
+
+                ref.invalidate(allAppointmentsAdminProvider);
+                ref.invalidate(userAppointmentsProvider);
+                ref.invalidate(adminAnalyticsProvider);
+
+                final allDoctors =
+                    ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
+                final doctor = allDoctors
+                    .where((d) =>
+                        d.id == appointment.doctorId ||
+                        d.userId == appointment.doctorId)
+                    .firstOrNull;
+                final doctorUserId = doctor?.userId ?? appointment.doctorId;
+
+                await UserNotificationService.instance.sendDoctorNotification(
+                  doctorUserId: doctorUserId,
+                  title: 'Consultation Completed',
+                  body:
+                      'Appointment with ${appointment.patientName} was concluded and marked completed by administration.',
+                  type: 'appointment_completed',
+                );
+
+                await UserNotificationService.instance.sendPatientNotification(
+                  patientUserId: appointment.patientId,
+                  title: 'Consultation Completed',
+                  body:
+                      'Your consultation with ${appointment.doctorName} was marked completed by administration.',
+                  type: 'appointment_completed',
+                );
+
+                if (context.mounted) {
+                  AppSnackBar.showSuccess(
+                    context,
+                    'Consultation marked as completed.',
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  AppSnackBar.showError(
+                    context,
+                    'Failed to complete consultation: $e',
+                  );
+                }
+              }
+            },
+            child: const Text('Mark Completed'),
+          ),
         ],
       ),
     );
