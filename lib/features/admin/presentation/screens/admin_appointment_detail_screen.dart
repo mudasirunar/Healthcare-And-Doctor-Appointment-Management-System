@@ -559,7 +559,7 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
         ),
         cancelLabel: 'Dismiss',
         onCancel: () => Navigator.pop(ctx),
-        confirmLabel: 'Confirm Cancellation',
+        confirmLabel: 'Cancel',
         confirmIsDestructive: true,
         onConfirm: () async {
           if (!formKey.currentState!.validate()) return;

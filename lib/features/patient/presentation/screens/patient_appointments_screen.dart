@@ -137,9 +137,9 @@ class _AppointmentsList extends ConsumerWidget {
             ),
           ),
         ),
-        cancelLabel: 'Keep Appointment',
+        cancelLabel: 'Keep',
         onCancel: () => Navigator.pop(ctx),
-        confirmLabel: 'Cancel Booking',
+        confirmLabel: 'Cancel',
         confirmIsDestructive: true,
         onConfirm: () async {
           final reason = reasonController.text.trim();
