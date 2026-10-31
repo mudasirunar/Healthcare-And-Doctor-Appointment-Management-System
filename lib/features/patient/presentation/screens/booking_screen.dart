@@ -7,6 +7,7 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 
@@ -101,22 +102,18 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
     }
 
     if (_selectedSlotUtc == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an available time slot.'),
-          backgroundColor: AppColors.warning,
-        ),
+      AppSnackBar.showWarning(
+        context,
+        'Please select an available time slot.',
       );
       return;
     }
 
     final reason = _reasonController.text.trim();
     if (reason.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a brief reason for your consultation.'),
-          backgroundColor: AppColors.warning,
-        ),
+      AppSnackBar.showWarning(
+        context,
+        'Please enter a brief reason for your consultation.',
       );
       return;
     }

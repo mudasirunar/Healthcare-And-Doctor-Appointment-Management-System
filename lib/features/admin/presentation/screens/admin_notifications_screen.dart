@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
 import '../../domain/entities/admin_notification_model.dart';
 import 'admin_appointment_detail_screen.dart';
@@ -36,13 +37,9 @@ class _AdminNotificationsScreenState
       case AdminNotificationType.doctorVerification:
         if (!item.isActionable) {
           // Already approved or declined: do not open approval flow
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'This credential request is already ${item.statusLabel.toLowerCase()}.',
-              ),
-              behavior: SnackBarBehavior.floating,
-            ),
+          AppSnackBar.showInfo(
+            context,
+            'This credential request is already ${item.statusLabel.toLowerCase()}.',
           );
           return;
         }

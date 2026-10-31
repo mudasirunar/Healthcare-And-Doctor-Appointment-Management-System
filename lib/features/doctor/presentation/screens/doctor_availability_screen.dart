@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:healthcare_app/core/providers/app_providers.dart';
 import 'package:healthcare_app/core/theme/app_colors.dart';
 import 'package:healthcare_app/core/theme/app_typography.dart';
+import 'package:healthcare_app/core/widgets/app_snack_bar.dart';
 import 'package:healthcare_app/features/doctor/domain/entities/doctor_model.dart';
 
 class DoctorAvailabilityScreen extends ConsumerStatefulWidget {
@@ -228,11 +229,9 @@ class _DoctorAvailabilityScreenState extends ConsumerState<DoctorAvailabilityScr
                           );
                         }
                         if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Availability schedule saved successfully!'),
-                              backgroundColor: AppColors.success,
-                            ),
+                          AppSnackBar.showSuccess(
+                            context,
+                            'Availability schedule saved successfully!',
                           );
                         }
                       } finally {

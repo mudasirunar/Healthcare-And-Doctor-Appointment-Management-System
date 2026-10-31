@@ -94,15 +94,6 @@ class MockAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> sendPasswordResetEmail(String email) async {
-    await Future.delayed(const Duration(milliseconds: 200));
-    final user = await _dataStore.getUserByEmail(email);
-    if (user == null) {
-      throw const AuthException('No account found for this email.');
-    }
-  }
-
-  @override
   Future<UserModel> updateProfile(UserModel user) async {
     await _dataStore.saveUser(user);
     if (_currentUser?.id == user.id) {

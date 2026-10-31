@@ -154,17 +154,6 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
-  Future<void> sendPasswordResetEmail(String email) async {
-    try {
-      await _firebaseAuth.sendPasswordResetEmail(email: email.trim());
-    } on FirebaseAuthException catch (e) {
-      throw AuthException(_mapFirebaseAuthError(e));
-    } catch (e) {
-      throw AuthException(e.toString());
-    }
-  }
-
-  @override
   Future<UserModel> updateProfile(UserModel user) async {
     final updatedMap = user.toMap();
     updatedMap['updatedAt'] = DateTime.now().toUtc().toIso8601String();
@@ -187,6 +176,8 @@ class FirebaseAuthRepository implements AuthRepository {
         return 'The password is too weak (minimum 6 characters).';
       case 'user-disabled':
         return 'This user account has been disabled.';
+      case 'internal-error':
+        return 'Email delivery service is currently unavailable for this address.';
       default:
         return e.message ?? 'Authentication error occurred.';
     }

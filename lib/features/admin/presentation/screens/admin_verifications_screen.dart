@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import '../../domain/entities/admin_analytics_model.dart';
@@ -31,19 +32,14 @@ class AdminVerificationsScreen extends ConsumerWidget {
     WidgetRef ref,
     DoctorModel doc,
   ) async {
+    AppSnackBar.showSuccess(
+      context,
+      '${doc.doctorName} approved and published.',
+    );
     await ref
         .read(doctorRepositoryProvider)
         .updateVerificationStatus(doc.id, VerificationStatus.approved);
     ref.invalidate(filteredDoctorsProvider);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${doc.doctorName} approved and published.'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
   }
 
   void _defaultReject(BuildContext context, WidgetRef ref, DoctorModel doc) {
@@ -75,6 +71,10 @@ class AdminVerificationsScreen extends ConsumerWidget {
               final reason = reasonCtrl.text.trim();
               if (reason.isEmpty) return;
               Navigator.pop(ctx);
+              AppSnackBar.showWarning(
+                context,
+                '${doc.doctorName} verification declined.',
+              );
               await ref.read(doctorRepositoryProvider).updateVerificationStatus(
                     doc.id,
                     VerificationStatus.rejected,

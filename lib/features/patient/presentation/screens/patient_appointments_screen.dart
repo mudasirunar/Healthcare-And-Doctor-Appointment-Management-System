@@ -5,6 +5,7 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
@@ -164,18 +165,14 @@ class _AppointmentsList extends ConsumerWidget {
                 ref.invalidate(userAppointmentsProvider);
 
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Appointment cancelled successfully.'),
-                      backgroundColor: AppColors.textPrimary,
-                    ),
+                  AppSnackBar.showInfo(
+                    context,
+                    'Appointment cancelled successfully.',
                   );
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error),
-                  );
+                  AppSnackBar.showError(context, e.toString());
                 }
               }
             },

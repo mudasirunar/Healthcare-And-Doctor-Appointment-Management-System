@@ -22,6 +22,5 @@ abstract class AuthRepository {
   });
 
   Future<void> signOut();
-  Future<void> sendPasswordResetEmail(String email);
   Future<UserModel> updateProfile(UserModel user);
 }

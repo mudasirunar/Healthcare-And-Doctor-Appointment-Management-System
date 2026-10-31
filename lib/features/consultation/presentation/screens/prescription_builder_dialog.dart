@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import 'package:healthcare_app/core/providers/app_providers.dart';
 import 'package:healthcare_app/core/theme/app_colors.dart';
 import 'package:healthcare_app/core/theme/app_typography.dart';
+import 'package:healthcare_app/core/widgets/app_snack_bar.dart';
 import 'package:healthcare_app/features/appointment/domain/entities/appointment_model.dart';
 import 'package:healthcare_app/features/consultation/domain/entities/prescription_model.dart';
 
@@ -50,8 +51,9 @@ class _PrescriptionBuilderDialogState extends ConsumerState<PrescriptionBuilderD
     final name = _medNameController.text.trim();
     final dosage = _dosageController.text.trim();
     if (name.isEmpty || dosage.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter medication name and dosage.')),
+      AppSnackBar.showWarning(
+        context,
+        'Please enter medication name and dosage.',
       );
       return;
     }
@@ -77,14 +79,16 @@ class _PrescriptionBuilderDialogState extends ConsumerState<PrescriptionBuilderD
   Future<void> _handleIssuePrescription() async {
     final diagnosis = _diagnosisController.text.trim();
     if (diagnosis.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please provide a medical diagnosis.')),
+      AppSnackBar.showWarning(
+        context,
+        'Please provide a medical diagnosis.',
       );
       return;
     }
     if (_medications.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please add at least one medication to the prescription.')),
+      AppSnackBar.showWarning(
+        context,
+        'Please add at least one medication to the prescription.',
       );
       return;
     }
@@ -124,18 +128,14 @@ class _PrescriptionBuilderDialogState extends ConsumerState<PrescriptionBuilderD
       widget.onPrescriptionCreated();
       if (mounted) {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Digital prescription generated and consultation finalized!'),
-            backgroundColor: AppColors.success,
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          'Digital prescription generated and consultation finalized!',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed: $e'), backgroundColor: AppColors.error),
-        );
+        AppSnackBar.showError(context, 'Failed: $e');
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

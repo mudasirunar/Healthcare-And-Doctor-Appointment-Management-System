@@ -4,6 +4,7 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
@@ -24,25 +25,21 @@ class AdminDoctorDetailScreen extends ConsumerWidget {
     VerificationStatus status, [
     String? notes,
   ]) async {
+    if (status == VerificationStatus.approved) {
+      AppSnackBar.showSuccess(
+        context,
+        '${doctor.doctorName} approved and published.',
+      );
+    } else {
+      AppSnackBar.showWarning(
+        context,
+        '${doctor.doctorName} status updated to ${status.displayName}.',
+      );
+    }
     await ref
         .read(doctorRepositoryProvider)
         .updateVerificationStatus(doctor.id, status, notes);
     ref.invalidate(filteredDoctorsProvider);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            status == VerificationStatus.approved
-                ? '${doctor.doctorName} approved and published.'
-                : '${doctor.doctorName} status updated to ${status.displayName}.',
-          ),
-          backgroundColor: status == VerificationStatus.approved
-              ? AppColors.success
-              : AppColors.warning,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    }
   }
 
   void _showRejectDialog(

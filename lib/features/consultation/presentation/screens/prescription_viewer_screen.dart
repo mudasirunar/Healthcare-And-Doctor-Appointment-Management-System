@@ -4,6 +4,7 @@ import 'package:healthcare_app/core/providers/app_providers.dart';
 import 'package:healthcare_app/core/theme/app_colors.dart';
 import 'package:healthcare_app/core/theme/app_typography.dart';
 import 'package:healthcare_app/core/utils/date_time_utils.dart';
+import 'package:healthcare_app/core/widgets/app_snack_bar.dart';
 import 'package:healthcare_app/core/widgets/state_views.dart';
 import 'package:healthcare_app/features/consultation/domain/entities/prescription_model.dart';
 
@@ -29,11 +30,9 @@ class PrescriptionViewerScreen extends ConsumerWidget {
             tooltip: 'Export / Print PDF',
             icon: const Icon(Icons.print_rounded),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Prescription PDF exported to device documents.'),
-                  backgroundColor: AppColors.success,
-                ),
+              AppSnackBar.showSuccess(
+                context,
+                'Prescription PDF exported to device documents.',
               );
             },
           ),
@@ -41,8 +40,9 @@ class PrescriptionViewerScreen extends ConsumerWidget {
             tooltip: 'Share',
             icon: const Icon(Icons.share_rounded),
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Prescription link copied to clipboard.')),
+              AppSnackBar.showInfo(
+                context,
+                'Prescription link copied to clipboard.',
               );
             },
           ),

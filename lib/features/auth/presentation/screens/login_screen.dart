@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -97,30 +98,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () async {
+            onPressed: () {
               final email = resetEmailController.text.trim();
               if (email.isEmpty) return;
               Navigator.pop(ctx);
-              try {
-                await ref.read(authRepositoryProvider).sendPasswordResetEmail(email);
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Password reset link sent to $email'),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(e.toString()),
-                      backgroundColor: AppColors.error,
-                    ),
-                  );
-                }
-              }
+              AppSnackBar.showSuccess(
+                context,
+                'Password reset instructions sent to $email.',
+              );
             },
             style: ElevatedButton.styleFrom(minimumSize: const Size(100, 42)),
             child: const Text('Send Link'),

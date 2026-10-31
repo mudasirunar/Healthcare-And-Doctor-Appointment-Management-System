@@ -4,6 +4,7 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
 
@@ -21,18 +22,14 @@ class DoctorRequestsScreen extends ConsumerWidget {
       );
       ref.invalidate(userAppointmentsProvider);
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Appointment confirmed successfully!'),
-            backgroundColor: AppColors.success,
-          ),
+        AppSnackBar.showSuccess(
+          context,
+          'Appointment confirmed successfully!',
         );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error),
-        );
+        AppSnackBar.showError(context, e.toString());
       }
     }
   }
@@ -79,15 +76,11 @@ class DoctorRequestsScreen extends ConsumerWidget {
                 );
                 ref.invalidate(userAppointmentsProvider);
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Appointment declined.')),
-                  );
+                  AppSnackBar.showInfo(context, 'Appointment declined.');
                 }
               } catch (e) {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(e.toString()), backgroundColor: AppColors.error),
-                  );
+                  AppSnackBar.showError(context, e.toString());
                 }
               }
             },

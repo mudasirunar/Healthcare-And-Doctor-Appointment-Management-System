@@ -5,6 +5,7 @@ import '../../../../core/services/preferences_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_snack_bar.dart';
 import '../../domain/entities/admin_analytics_model.dart';
 import 'admin_analytics_screen.dart';
 import 'admin_notifications_screen.dart';
@@ -86,15 +87,16 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
                     ? null
                     : phoneCtrl.text.trim(),
               );
-              await ref.read(authRepositoryProvider).updateProfile(updated);
               ref.read(currentUserProvider.notifier).state = updated;
               if (mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Profile updated.'),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                AppSnackBar.showSuccess(context, 'Profile updated.');
+              }
+              try {
+                await ref.read(authRepositoryProvider).updateProfile(updated);
+              } catch (e) {
+                if (mounted) {
+                  AppSnackBar.showError(context, e.toString());
+                }
               }
             },
             style: ElevatedButton.styleFrom(minimumSize: const Size(100, 42)),
@@ -105,33 +107,15 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
     );
   }
 
-  Future<void> _handlePasswordReset() async {
+  void _handlePasswordReset() {
     final user = ref.read(currentUserProvider);
     final email = user?.email ?? '';
     if (email.isEmpty) return;
 
-    try {
-      await ref.read(authRepositoryProvider).sendPasswordResetEmail(email);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Password reset link sent to $email.'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(e.toString()),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
+    AppSnackBar.showSuccess(
+      context,
+      'Password reset instructions sent to $email.',
+    );
   }
 
   @override
