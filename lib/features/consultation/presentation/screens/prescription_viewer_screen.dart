@@ -16,8 +16,12 @@ class PrescriptionViewerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final aptRepo = ref.watch(appointmentRepositoryProvider);
 
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textSecondary = AppColors.textSecondaryOf(context);
+    final borderColor = AppColors.borderOf(context);
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundOf(context),
       appBar: AppBar(
         title: const Text('Digital Prescription'),
         actions: [
@@ -60,9 +64,9 @@ class PrescriptionViewerScreen extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: AppColors.surfaceOf(context),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: borderColor),
                 boxShadow: const [
                   BoxShadow(
                     color: Color(0x06000000),
@@ -78,33 +82,44 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryLight,
-                              borderRadius: BorderRadius.circular(10),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryLightOf(context),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 28),
                             ),
-                            child: const Icon(Icons.local_hospital_rounded, color: AppColors.primary, size: 28),
-                          ),
-                          const SizedBox(width: 12),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text('Healthcare Telehealth Network', style: AppTypography.headline),
-                              Text('Certified Digital Telehealth Clinic', style: AppTypography.caption),
-                            ],
-                          ),
-                        ],
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Healthcare Telehealth Network',
+                                    style: AppTypography.headline.copyWith(color: textPrimary),
+                                  ),
+                                  Text(
+                                    'Certified Digital Telehealth Clinic',
+                                    style: AppTypography.caption.copyWith(color: textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         'Rx #${rx.id.toUpperCase()}',
                         style: AppTypography.caption.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700),
                       ),
                     ],
                   ),
-                  const Divider(height: 28, color: AppColors.border, thickness: 1.5),
+                  Divider(height: 28, color: borderColor, thickness: 1.5),
 
                   // Doctor & Patient Meta
                   Row(
@@ -114,9 +129,9 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('PRESCRIBING PHYSICIAN', style: AppTypography.caption),
+                            Text('PRESCRIBING PHYSICIAN', style: AppTypography.caption.copyWith(color: textSecondary)),
                             const SizedBox(height: 4),
-                            Text(rx.doctorName, style: AppTypography.headline.copyWith(fontSize: 16)),
+                            Text(rx.doctorName, style: AppTypography.headline.copyWith(fontSize: 16, color: textPrimary)),
                             Text(rx.doctorSpecialty, style: AppTypography.bodyMedium.copyWith(color: AppColors.primary)),
                           ],
                         ),
@@ -125,36 +140,36 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
-                            const Text('PATIENT DETAILS', style: AppTypography.caption),
+                            Text('PATIENT DETAILS', style: AppTypography.caption.copyWith(color: textSecondary)),
                             const SizedBox(height: 4),
-                            Text(rx.patientName, style: AppTypography.headline.copyWith(fontSize: 16)),
+                            Text(rx.patientName, style: AppTypography.headline.copyWith(fontSize: 16, color: textPrimary)),
                             Text(
                               'Date: ${DateTimeUtils.formatLocalDate(rx.issuedAtUtc)}',
-                              style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                              style: AppTypography.caption.copyWith(color: textSecondary),
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const Divider(height: 28, color: AppColors.border),
+                  Divider(height: 28, color: borderColor),
 
                   // Diagnosis
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: AppColors.surfaceVariant,
+                      color: AppColors.surfaceVariantOf(context),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('DIAGNOSIS & CLINICAL IMPRESSION', style: AppTypography.caption.copyWith(color: AppColors.textSecondary)),
+                        Text('DIAGNOSIS & CLINICAL IMPRESSION', style: AppTypography.caption.copyWith(color: textSecondary)),
                         const SizedBox(height: 4),
                         Text(
                           rx.diagnosis,
-                          style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w600),
+                          style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w600, color: textPrimary),
                         ),
                       ],
                     ),
@@ -164,7 +179,7 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                   // Rx Symbol Header
                   Row(
                     children: [
-                      Text(
+                      const Text(
                         '℞',
                         style: TextStyle(
                           fontSize: 32,
@@ -174,7 +189,7 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                         ),
                       ),
                       const SizedBox(width: 8),
-                      const Text('Prescribed Medications', style: AppTypography.headline),
+                      Text('Prescribed Medications', style: AppTypography.headline.copyWith(color: textPrimary)),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -184,7 +199,7 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: rx.medications.length,
-                    separatorBuilder: (_, __) => const Divider(height: 16, color: AppColors.border),
+                    separatorBuilder: (_, __) => Divider(height: 16, color: borderColor),
                     itemBuilder: (context, index) {
                       final med = rx.medications[index];
                       return Row(
@@ -195,7 +210,7 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                             height: 24,
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
-                              color: AppColors.primaryLight,
+                              color: AppColors.primaryLightOf(context),
                               shape: BoxShape.circle,
                             ),
                             child: Text(
@@ -213,12 +228,12 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                                   children: [
                                     Text(
                                       med.name,
-                                      style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w700),
+                                      style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w700, color: textPrimary),
                                     ),
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                       decoration: BoxDecoration(
-                                        color: AppColors.secondaryLight,
+                                        color: AppColors.secondaryLightOf(context),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                       child: Text(
@@ -231,13 +246,13 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                                 const SizedBox(height: 2),
                                 Text(
                                   'Frequency: ${med.frequency} • Duration: ${med.duration}',
-                                  style: AppTypography.bodyMedium,
+                                  style: AppTypography.bodyMedium.copyWith(color: textSecondary),
                                 ),
                                 if (med.instructions != null) ...[
                                   const SizedBox(height: 2),
                                   Text(
                                     'Special Note: ${med.instructions}',
-                                    style: AppTypography.caption.copyWith(color: AppColors.textSecondary),
+                                    style: AppTypography.caption.copyWith(color: textSecondary),
                                   ),
                                 ],
                               ],
@@ -249,39 +264,44 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                   ),
 
                   if (rx.notes != null && rx.notes!.isNotEmpty) ...[
-                    const Divider(height: 28, color: AppColors.border),
-                    const Text('ADDITIONAL ADVICE / FOLLOW-UP', style: AppTypography.caption),
+                    Divider(height: 28, color: borderColor),
+                    Text('ADDITIONAL ADVICE / FOLLOW-UP', style: AppTypography.caption.copyWith(color: textSecondary)),
                     const SizedBox(height: 6),
-                    Text(rx.notes!, style: AppTypography.bodyMedium),
+                    Text(rx.notes!, style: AppTypography.bodyMedium.copyWith(color: textSecondary)),
                   ],
 
-                  const Divider(height: 32, color: AppColors.border, thickness: 1.5),
+                  Divider(height: 32, color: borderColor, thickness: 1.5),
 
                   // Digital Signature Block
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: const [
-                              Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.success),
-                              SizedBox(width: 4),
-                              Text(
-                                'Cryptographically Verified Digital Record',
-                                style: TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Issued: ${DateTimeUtils.formatFullWithTimeZone(rx.issuedAtUtc)}',
-                            style: AppTypography.caption.copyWith(color: AppColors.textMuted),
-                          ),
-                        ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Row(
+                              children: [
+                                Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.success),
+                                SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    'Cryptographically Verified Digital Record',
+                                    style: TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Issued: ${DateTimeUtils.formatFullWithTimeZone(rx.issuedAtUtc)}',
+                              style: AppTypography.caption.copyWith(color: AppColors.textMutedOf(context)),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
@@ -295,7 +315,7 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                               children: [
                                 Text(
                                   rx.doctorName,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontFamily: 'serif',
                                     fontStyle: FontStyle.italic,
                                     fontWeight: FontWeight.bold,

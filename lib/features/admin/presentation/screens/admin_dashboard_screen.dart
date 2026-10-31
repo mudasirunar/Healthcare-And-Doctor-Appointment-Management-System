@@ -1,170 +1,92 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
-import '../../../doctor/domain/entities/specialty_model.dart';
-import 'admin_analytics_screen.dart';
+import 'admin_appointments_screen.dart';
+import 'admin_directory_screen.dart';
+import 'admin_doctor_detail_screen.dart';
+import 'admin_notifications_screen.dart';
+import 'admin_overview_screen.dart';
 import 'admin_settings_screen.dart';
-import 'admin_specialties_screen.dart';
-import 'admin_verifications_screen.dart';
+
+final adminSelectedTabProvider = StateProvider<int>((ref) => 0);
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
 
   @override
-  ConsumerState<AdminDashboardScreen> createState() => _AdminDashboardScreenState();
+  ConsumerState<AdminDashboardScreen> createState() =>
+      _AdminDashboardScreenState();
 }
 
 class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
-  int _tabIndex = 0;
   late final List<ScrollController> _scrollControllers = List.generate(
     4,
     (_) => ScrollController(),
   );
 
   @override
+  void initState() {
+    super.initState();
+    NotificationService.instance.onNotificationTap = _handleOsNotificationTap;
+  }
+
+  @override
   void dispose() {
+    if (NotificationService.instance.onNotificationTap ==
+        _handleOsNotificationTap) {
+      NotificationService.instance.onNotificationTap = null;
+    }
     for (final ctrl in _scrollControllers) {
       ctrl.dispose();
     }
     super.dispose();
   }
 
-  Future<void> _handleApproveDoctor(DoctorModel doc) async {
-    final docRepo = ref.read(doctorRepositoryProvider);
-    await docRepo.updateVerificationStatus(doc.id, VerificationStatus.approved);
-    ref.invalidate(filteredDoctorsProvider);
+  void _handleOsNotificationTap(String payload) {
+    if (!mounted) return;
+    final currentUser = ref.read(currentUserProvider);
+    if (currentUser == null || !currentUser.isAdmin) return;
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${doc.doctorName} approved and published to directory.'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    // Format: "doctor_verify:<doctorId>:<notifId>"
+    if (payload.startsWith('doctor_verify:')) {
+      final parts = payload.split(':');
+      final doctorId = parts.length > 1 ? parts[1] : '';
+      final notifId =
+          parts.length > 2 ? parts[2] : 'doc_verify_$doctorId';
+
+      // Mark notification as read immediately when opened from phone tray
+      ref.read(readNotificationsProvider.notifier).markAsRead(notifId);
+
+      final allDocs = ref.read(allDoctorsAdminProvider).valueOrNull ?? [];
+      final doc = allDocs.where((d) => d.id == doctorId).firstOrNull;
+
+      if (doc != null && doc.verificationStatus == VerificationStatus.pending) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AdminDoctorDetailScreen(doctorId: doc.id),
+          ),
+        );
+      } else {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const AdminNotificationsScreen(),
+          ),
+        );
+      }
+      return;
     }
-  }
 
-  void _handleRejectDoctor(DoctorModel doc) {
-    final reasonController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          'Decline Credentials',
-          style: AppTypography.headline.copyWith(color: AppColors.textPrimaryOf(ctx)),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Provide a reason for declining ${doc.doctorName} (e.g. unverified medical board license):',
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondaryOf(ctx)),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Rejection Reason',
-                hintText: 'Enter verification notes...',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final reason = reasonController.text.trim();
-              if (reason.isEmpty) return;
-              Navigator.pop(ctx);
-              final docRepo = ref.read(doctorRepositoryProvider);
-              await docRepo.updateVerificationStatus(
-                doc.id,
-                VerificationStatus.rejected,
-                reason,
-              );
-              ref.invalidate(filteredDoctorsProvider);
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              minimumSize: const Size(120, 42),
-            ),
-            child: const Text('Decline'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showAddSpecialtyDialog() {
-    final nameCtrl = TextEditingController();
-    final descCtrl = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          'New Medical Specialty',
-          style: AppTypography.headline.copyWith(color: AppColors.textPrimaryOf(ctx)),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Department Name',
-                hintText: 'e.g. Ophthalmology',
-                prefixIcon: Icon(Icons.medical_information_outlined),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: descCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Clinical Scope & Description',
-                hintText: 'e.g. Eye care, vision correction & retinal surgery',
-                prefixIcon: Icon(Icons.description_outlined),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final name = nameCtrl.text.trim();
-              if (name.isEmpty) return;
-              Navigator.pop(ctx);
-              final newSpec = SpecialtyModel(
-                id: 'spec_${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_')}',
-                name: name,
-                description: descCtrl.text.trim().isEmpty
-                    ? 'Specialized clinical care and consultations'
-                    : descCtrl.text.trim(),
-                iconName: name.toLowerCase(),
-                activeDoctorCount: 0,
-              );
-              await ref.read(doctorRepositoryProvider).saveSpecialty(newSpec);
-            },
-            style: ElevatedButton.styleFrom(minimumSize: const Size(110, 42)),
-            child: const Text('Create'),
-          ),
-        ],
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const AdminNotificationsScreen(),
       ),
     );
   }
@@ -175,11 +97,15 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       builder: (ctx) => AlertDialog(
         title: Text(
           'Sign Out?',
-          style: AppTypography.headline.copyWith(color: AppColors.textPrimaryOf(ctx)),
+          style: AppTypography.headline.copyWith(
+            color: AppColors.textPrimaryOf(ctx),
+          ),
         ),
         content: Text(
           'Are you sure you want to sign out of your account?',
-          style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondaryOf(ctx)),
+          style: AppTypography.bodyMedium.copyWith(
+            color: AppColors.textSecondaryOf(ctx),
+          ),
         ),
         actions: [
           TextButton(
@@ -206,80 +132,92 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final pendingAsync = ref.watch(pendingDoctorsProvider);
+    // Watch pendingDoctorsProvider so real-time doctor registration listener stays active
+    ref.watch(pendingDoctorsProvider);
+    final tabIndex = ref.watch(adminSelectedTabProvider);
     final analyticsAsync = ref.watch(adminAnalyticsProvider);
     final specialtiesAsync = ref.watch(specialtiesProvider);
+    final notifications = ref.watch(adminNotificationsProvider);
+    final readIds = ref.watch(readNotificationsProvider);
 
-    final pendingCount = pendingAsync.valueOrNull?.length ?? 0;
+    final unreadCount =
+        notifications.where((n) => !readIds.contains(n.id)).length;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundOf(context),
       extendBody: true,
       appBar: _buildContextualAppBar(
         context,
-        pendingCount: pendingCount,
-        specialtyCount: specialtiesAsync.valueOrNull?.length ?? 0,
+        tabIndex: tabIndex,
+        unreadNotificationsCount: unreadCount,
       ),
       body: SafeArea(
         bottom: false,
         child: IndexedStack(
-          index: _tabIndex,
+          index: tabIndex,
           children: [
-            // Tab 0: Verification Desk
-            AdminVerificationsScreen(
-              pendingAsync: pendingAsync,
-              analyticsAsync: analyticsAsync,
-              onApprove: _handleApproveDoctor,
-              onReject: _handleRejectDoctor,
-              scrollController: _scrollControllers[0],
+            // Tab 0: Overview (Executive Hub + Specialties + Top Specialists)
+            Material(
+              type: MaterialType.transparency,
+              child: AdminOverviewScreen(
+                analyticsAsync: analyticsAsync,
+                specialtiesAsync: specialtiesAsync,
+                scrollController: _scrollControllers[0],
+                onSwitchTab: (idx) =>
+                    ref.read(adminSelectedTabProvider.notifier).state = idx,
+              ),
             ),
 
-            // Tab 1: Live Cloud Analytics
-            AdminAnalyticsScreen(
-              analyticsAsync: analyticsAsync,
-              specialtiesAsync: specialtiesAsync,
-              scrollController: _scrollControllers[1],
+            // Tab 1: Directory (Doctors & Patients with Smart Search)
+            Material(
+              type: MaterialType.transparency,
+              child: AdminDirectoryScreen(
+                scrollController: _scrollControllers[1],
+              ),
             ),
 
-            // Tab 2: Medical Specialties Catalog
-            AdminSpecialtiesScreen(
-              specialtiesAsync: specialtiesAsync,
-              analyticsAsync: analyticsAsync,
-              onAddSpecialty: _showAddSpecialtyDialog,
-              scrollController: _scrollControllers[2],
+            // Tab 2: Appointments & Prescriptions
+            Material(
+              type: MaterialType.transparency,
+              child: AdminAppointmentsScreen(
+                scrollController: _scrollControllers[2],
+              ),
             ),
 
-            // Tab 3: Admin Profile & Settings
-            AdminSettingsScreen(
-              analyticsAsync: analyticsAsync,
-              onSignOut: _confirmSignOut,
-              scrollController: _scrollControllers[3],
+            // Tab 3: Profile & Settings
+            Material(
+              type: MaterialType.transparency,
+              child: AdminSettingsScreen(
+                analyticsAsync: analyticsAsync,
+                onSignOut: _confirmSignOut,
+                scrollController: _scrollControllers[3],
+              ),
             ),
           ],
         ),
       ),
       bottomNavigationBar: AppBottomNavBar(
-        currentIndex: _tabIndex,
+        currentIndex: tabIndex,
         scrollControllers: _scrollControllers,
-        onTap: (idx) => setState(() => _tabIndex = idx),
-        items: [
+        onTap: (idx) =>
+            ref.read(adminSelectedTabProvider.notifier).state = idx,
+        items: const [
           AppNavItem(
-            label: 'Verifications',
-            icon: Icons.verified_user_outlined,
-            activeIcon: Icons.verified_user_rounded,
-            badgeCount: pendingCount,
+            label: 'Overview',
+            icon: Icons.dashboard_outlined,
+            activeIcon: Icons.dashboard_rounded,
           ),
-          const AppNavItem(
-            label: 'Analytics',
-            icon: Icons.insights_outlined,
-            activeIcon: Icons.insights_rounded,
+          AppNavItem(
+            label: 'Directory',
+            icon: Icons.people_outline_rounded,
+            activeIcon: Icons.people_alt_rounded,
           ),
-          const AppNavItem(
-            label: 'Specialties',
-            icon: Icons.grid_view_outlined,
-            activeIcon: Icons.grid_view_rounded,
+          AppNavItem(
+            label: 'Appointments',
+            icon: Icons.calendar_today_outlined,
+            activeIcon: Icons.calendar_month_rounded,
           ),
-          const AppNavItem(
+          AppNavItem(
             label: 'Settings',
             icon: Icons.manage_accounts_outlined,
             activeIcon: Icons.manage_accounts_rounded,
@@ -291,60 +229,40 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
   PreferredSizeWidget _buildContextualAppBar(
     BuildContext context, {
-    required int pendingCount,
-    required int specialtyCount,
+    required int tabIndex,
+    required int unreadNotificationsCount,
   }) {
     final surfaceColor = AppColors.surfaceOf(context);
     final borderColor = AppColors.borderOf(context);
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
 
-    final (String title, String subtitle, Widget? trailing) = switch (_tabIndex) {
+    final (String title, String subtitle, Widget? trailing) =
+        switch (tabIndex) {
       0 => (
-          'Doctor Verifications',
-          'Credential & Medical Board Review Queue',
-          _HeaderBadge(
-            icon: pendingCount > 0 ? Icons.pending_actions_rounded : Icons.check_circle_outline_rounded,
-            label: pendingCount > 0 ? '$pendingCount Pending' : 'Queue Clear',
-            color: pendingCount > 0 ? AppColors.warning : AppColors.success,
-            bgColor: pendingCount > 0
-                ? AppColors.warningLightOf(context)
-                : AppColors.successLightOf(context),
+          'Admin Overview',
+          'Specialists, Patients & Daily Operations',
+          _NotificationBellButton(
+            unreadCount: unreadNotificationsCount,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const AdminNotificationsScreen(),
+                ),
+              );
+            },
           ),
         ),
       1 => (
-          'Platform Analytics',
-          'Appointments, Specialists & Patient Insights',
+          'Medical Directory',
+          'Specialists & Registered Patients',
           null,
         ),
       2 => (
-          'Medical Specialties',
-          '$specialtyCount Active Clinical Departments',
-          GestureDetector(
-            onTap: _showAddSpecialtyDialog,
-            child: Container(
-              height: 40,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.add_rounded, size: 18, color: Colors.white),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Add',
-                    style: AppTypography.bodyMedium.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          'Appointments & Records',
+          'Consultations, Schedules & Prescriptions',
+          null,
         ),
       _ => (
           'Profile & Settings',
@@ -399,40 +317,60 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   }
 }
 
-class _HeaderBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final Color bgColor;
+class _NotificationBellButton extends StatelessWidget {
+  final int unreadCount;
+  final VoidCallback onTap;
 
-  const _HeaderBadge({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.bgColor,
+  const _NotificationBellButton({
+    required this.unreadCount,
+    required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 15, color: color),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: AppTypography.caption.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
+    final textPrimary = AppColors.textPrimaryOf(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariantOf(context),
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.borderOf(context)),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              unreadCount > 0
+                  ? Icons.notifications_rounded
+                  : Icons.notifications_none_rounded,
+              size: 22,
+              color: unreadCount > 0 ? AppColors.primary : textPrimary,
             ),
-          ),
-        ],
+            if (unreadCount > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.surfaceOf(context),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

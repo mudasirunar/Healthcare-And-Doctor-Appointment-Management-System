@@ -1,11 +1,14 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:healthcare_app/core/services/notification_service.dart';
 import 'package:healthcare_app/core/services/preferences_service.dart';
 import 'package:healthcare_app/features/admin/domain/entities/admin_analytics_model.dart';
+import 'package:healthcare_app/features/admin/domain/entities/admin_notification_model.dart';
 import 'package:healthcare_app/features/auth/domain/entities/user_model.dart';
 import 'package:healthcare_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:healthcare_app/features/auth/data/repositories/firebase_auth_repository.dart';
+import 'package:healthcare_app/features/consultation/domain/entities/prescription_model.dart';
 import 'package:healthcare_app/features/doctor/domain/entities/doctor_model.dart';
 import 'package:healthcare_app/features/doctor/domain/entities/specialty_model.dart';
 import 'package:healthcare_app/features/doctor/domain/repositories/doctor_repository.dart';
@@ -26,6 +29,30 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
 
 final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((ref) {
   return ThemeModeNotifier();
+});
+
+// --- ADMIN NOTIFICATION READ STATE & PREFERENCES ---
+class ReadNotificationsNotifier extends StateNotifier<Set<String>> {
+  ReadNotificationsNotifier()
+      : super(PreferencesService.instance.getReadNotificationIds());
+
+  Future<void> markAsRead(String id) async {
+    if (state.contains(id)) return;
+    state = {...state, id};
+    await PreferencesService.instance.markNotificationRead(id);
+  }
+
+  Future<void> markAllAsRead(Iterable<String> ids) async {
+    final next = {...state, ...ids};
+    if (next.length == state.length) return;
+    state = next;
+    await PreferencesService.instance.markNotificationsRead(ids);
+  }
+}
+
+final readNotificationsProvider =
+    StateNotifierProvider<ReadNotificationsNotifier, Set<String>>((ref) {
+  return ReadNotificationsNotifier();
 });
 
 // --- LIVE FIREBASE REPOSITORIES ---
@@ -122,13 +149,171 @@ final userAppointmentsProvider = FutureProvider<List<AppointmentModel>>((ref) as
   }
 });
 
-// --- ADMIN LIVE METRICS & VERIFICATIONS (REAL-TIME STREAMS) ---
+// --- ADMIN LIVE DIRECTORY, APPOINTMENTS, PRESCRIPTIONS & NOTIFICATIONS ---
+final allDoctorsAdminProvider = StreamProvider<List<DoctorModel>>((ref) {
+  return FirebaseFirestore.instance
+      .collection('doctors')
+      .snapshots()
+      .map((s) => s.docs.map((d) => DoctorModel.fromMap(d.data(), id: d.id)).toList());
+});
+
+final allPatientsAdminProvider = StreamProvider<List<UserModel>>((ref) {
+  return FirebaseFirestore.instance
+      .collection('users')
+      .where('role', isEqualTo: 'patient')
+      .snapshots()
+      .map((s) => s.docs.map((d) => UserModel.fromMap(d.data(), id: d.id)).toList());
+});
+
+final allAppointmentsAdminProvider = StreamProvider<List<AppointmentModel>>((ref) {
+  return FirebaseFirestore.instance
+      .collection('appointments')
+      .snapshots()
+      .map((s) {
+        final list = s.docs
+            .map((d) => AppointmentModel.fromMap(d.data(), id: d.id))
+            .toList();
+        list.sort((a, b) => b.scheduledTimeUtc.compareTo(a.scheduledTimeUtc));
+        return list;
+      });
+});
+
+final allPrescriptionsAdminProvider = StreamProvider<List<PrescriptionModel>>((ref) {
+  return FirebaseFirestore.instance
+      .collection('prescriptions')
+      .snapshots()
+      .map((s) {
+        final list = s.docs
+            .map((d) => PrescriptionModel.fromMap(d.data(), id: d.id))
+            .toList();
+        list.sort((a, b) => b.issuedAtUtc.compareTo(a.issuedAtUtc));
+        return list;
+      });
+});
+
 final pendingDoctorsProvider = StreamProvider<List<DoctorModel>>((ref) {
   return FirebaseFirestore.instance
       .collection('doctors')
       .where('verificationStatus', isEqualTo: 'pending')
       .snapshots()
-      .map((s) => s.docs.map((d) => DoctorModel.fromMap(d.data(), id: d.id)).toList());
+      .map((s) {
+        final pendingList = s.docs
+            .map((d) => DoctorModel.fromMap(d.data(), id: d.id))
+            .toList();
+
+        // Trigger local notification for newly arrived pending doctor applications
+        final user = ref.read(currentUserProvider);
+        if (user != null &&
+            user.isAdmin &&
+            PreferencesService.instance.getDoctorVerificationAlertsEnabled()) {
+          final alerted = PreferencesService.instance.getAlertedNotificationIds();
+          for (final doc in pendingList) {
+            final notifId = 'doc_verify_${doc.id}';
+            if (!alerted.contains(notifId)) {
+              PreferencesService.instance.markNotificationAlerted(notifId);
+              NotificationService.instance.showLocalNotification(
+                title: 'New Doctor Verification Request',
+                body: '${doc.doctorName} (${doc.specialtyName}) submitted credentials for review.',
+                payload: 'doctor_verify:${doc.id}:$notifId',
+              );
+            }
+          }
+        }
+        return pendingList;
+      });
+});
+
+/// Combines Doctor Verification items & Appointment/Prescription activity into a unified Admin Notification list.
+final adminNotificationsProvider = Provider<List<AdminNotificationItem>>((ref) {
+  final doctors = ref.watch(allDoctorsAdminProvider).valueOrNull ?? [];
+  final appointments = ref.watch(allAppointmentsAdminProvider).valueOrNull ?? [];
+  final prescriptions = ref.watch(allPrescriptionsAdminProvider).valueOrNull ?? [];
+
+  final items = <AdminNotificationItem>[];
+
+  // 1. Pending doctors first (Actionable)
+  for (final doc in doctors) {
+    if (doc.verificationStatus == VerificationStatus.pending) {
+      items.add(
+        AdminNotificationItem(
+          id: 'doc_verify_${doc.id}',
+          title: 'Credential Review Required: ${doc.doctorName}',
+          subtitle:
+              '${doc.specialtyName} • License ${doc.licenseNumber} • ${doc.experienceYears} yrs experience',
+          timestampIso: DateTime.now().toUtc().toIso8601String(),
+          type: AdminNotificationType.doctorVerification,
+          targetId: doc.id,
+          isActionable: true,
+          statusLabel: 'Pending Approval',
+        ),
+      );
+    }
+  }
+
+  // 2. Recent appointments (Requested, Confirmed, In Progress, Cancelled, Completed)
+  for (final apt in appointments) {
+    final statusText = switch (apt.status) {
+      AppointmentStatus.requested => 'New Booking Request',
+      AppointmentStatus.confirmed => 'Appointment Confirmed',
+      AppointmentStatus.inProgress => 'Consultation In Progress',
+      AppointmentStatus.completed => 'Consultation Completed',
+      AppointmentStatus.cancelled => 'Appointment Cancelled',
+      AppointmentStatus.rejected => 'Appointment Declined',
+    };
+    items.add(
+      AdminNotificationItem(
+        id: 'apt_${apt.id}_${apt.status.name}',
+        title: '$statusText • ${apt.patientName}',
+        subtitle: 'With ${apt.doctorName} (${apt.doctorSpecialty}) — ${apt.reasonForVisit}',
+        timestampIso: apt.updatedAt.isNotEmpty ? apt.updatedAt : apt.scheduledTimeUtc,
+        type: AdminNotificationType.appointmentActivity,
+        targetId: apt.id,
+        isActionable: true,
+        statusLabel: apt.status.displayName,
+      ),
+    );
+  }
+
+  // 3. Prescriptions issued
+  for (final rx in prescriptions) {
+    items.add(
+      AdminNotificationItem(
+        id: 'rx_${rx.id}',
+        title: 'Prescription Issued to ${rx.patientName}',
+        subtitle: '${rx.doctorName} • Diagnosis: ${rx.diagnosis}',
+        timestampIso: rx.issuedAtUtc,
+        type: AdminNotificationType.prescriptionIssued,
+        targetId: rx.id,
+        isActionable: true,
+        statusLabel: 'Prescription',
+      ),
+    );
+  }
+
+  // 4. Resolved doctor verifications (Approved / Rejected) — ONLY for doctors that previously triggered a verification notification
+  final alertedIds = PreferencesService.instance.getAlertedNotificationIds();
+  final readIds = ref.watch(readNotificationsProvider);
+  for (final doc in doctors) {
+    final notifId = 'doc_verify_${doc.id}';
+    if (doc.verificationStatus != VerificationStatus.pending &&
+        (alertedIds.contains(notifId) || readIds.contains(notifId))) {
+      final isApproved = doc.verificationStatus == VerificationStatus.approved;
+      items.add(
+        AdminNotificationItem(
+          id: notifId,
+          title: 'Doctor Verification: ${doc.doctorName}',
+          subtitle: '${doc.specialtyName} • License ${doc.licenseNumber}',
+          timestampIso: DateTime.now().toUtc().toIso8601String(),
+          type: AdminNotificationType.doctorVerification,
+          targetId: doc.id,
+          isActionable: false,
+          statusLabel: isApproved ? 'Resolved • Approved' : 'Resolved • Declined',
+        ),
+      );
+    }
+  }
+
+  return items;
 });
 
 final adminAnalyticsProvider = StreamProvider<AdminAnalyticsModel>((ref) {
@@ -148,6 +333,12 @@ final adminAnalyticsProvider = StreamProvider<AdminAnalyticsModel>((ref) {
     final appointments = appointmentsSnap.docs
         .map((d) => AppointmentModel.fromMap(d.data(), id: d.id))
         .toList();
+
+    int prescriptionCount = 0;
+    try {
+      final rxSnap = await firestore.collection('prescriptions').get();
+      prescriptionCount = rxSnap.docs.length;
+    } catch (_) {}
 
     int patientCount = 0;
     try {
@@ -230,6 +421,7 @@ final adminAnalyticsProvider = StreamProvider<AdminAnalyticsModel>((ref) {
       upcomingAppointments: upcomingCount,
       completedAppointments: completedCount,
       cancelledAppointments: cancelledCount,
+      totalPrescriptions: prescriptionCount,
       avgConsultationFee: avgFee,
       minConsultationFee: minFee,
       maxConsultationFee: maxFee,

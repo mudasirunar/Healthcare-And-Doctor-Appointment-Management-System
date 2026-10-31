@@ -18,6 +18,26 @@ class PatientHomeScreen extends ConsumerStatefulWidget {
 
 class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
   final _searchController = TextEditingController();
+  final Map<String, GlobalKey> _specialtyKeys = {};
+
+  GlobalKey _keyForSpecialty(String id) =>
+      _specialtyKeys.putIfAbsent(id, () => GlobalKey());
+
+  void _centerSpecialty(String? id) {
+    if (id == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = _specialtyKeys[id]?.currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.5,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -291,66 +311,89 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
                 data: (specialties) {
                   return SizedBox(
                     height: 104,
-                    child: ListView.separated(
+                    child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
-                      itemCount: specialties.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, index) {
-                        final spec = specialties[index];
-                        final isSelected = filterState.specialtyId == spec.id;
+                      child: Row(
+                        children: List.generate(specialties.length, (index) {
+                          final spec = specialties[index];
+                          final isSelected = filterState.specialtyId == spec.id;
+                          final itemKey = _keyForSpecialty(spec.id);
 
-                        return InkWell(
-                          onTap: () {
-                            ref.read(doctorFilterProvider.notifier).state = filterState.copyWith(
-                              specialtyId: isSelected ? null : spec.id,
-                              clearSpecialty: isSelected,
-                            );
-                          },
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            width: 108,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: isSelected ? AppColors.primary : AppColors.surface,
+                          return Padding(
+                            key: itemKey,
+                            padding: EdgeInsets.only(
+                              right: index == specialties.length - 1 ? 0 : 12,
+                            ),
+                            child: InkWell(
+                              onTap: () {
+                                final nextId = isSelected ? null : spec.id;
+                                ref.read(doctorFilterProvider.notifier).state =
+                                    filterState.copyWith(
+                                  specialtyId: nextId,
+                                  clearSpecialty: isSelected,
+                                );
+                                _centerSpecialty(nextId);
+                              },
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(
-                                color: isSelected ? AppColors.primary : AppColors.border,
-                                width: isSelected ? 1.5 : 1,
+                              child: Container(
+                                width: 108,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 12,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : AppColors.surface,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: isSelected
+                                        ? AppColors.primary
+                                        : AppColors.border,
+                                    width: isSelected ? 1.5 : 1,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? Colors.white.withValues(alpha: 0.2)
+                                            : AppColors.primaryLight,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: Icon(
+                                        _getSpecialtyIcon(spec.iconName),
+                                        size: 22,
+                                        color: isSelected
+                                            ? Colors.white
+                                            : AppColors.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      spec.name,
+                                      textAlign: TextAlign.center,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: AppTypography.caption.copyWith(
+                                        color: isSelected
+                                            ? Colors.white
+                                            : AppColors.textPrimary,
+                                        fontWeight: isSelected
+                                            ? FontWeight.w700
+                                            : FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: isSelected
-                                        ? Colors.white.withOpacity(0.2)
-                                        : AppColors.primaryLight,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    _getSpecialtyIcon(spec.iconName),
-                                    size: 22,
-                                    color: isSelected ? Colors.white : AppColors.primary,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  spec.name,
-                                  textAlign: TextAlign.center,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: AppTypography.caption.copyWith(
-                                    color: isSelected ? Colors.white : AppColors.textPrimary,
-                                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
+                          );
+                        }),
+                      ),
                     ),
                   );
                 },

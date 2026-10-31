@@ -13,7 +13,10 @@ class NotificationService {
   static final NotificationService instance = NotificationService._();
 
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
-  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _localNotifications =
+      FlutterLocalNotificationsPlugin();
+
+  void Function(String payload)? onNotificationTap;
 
   Future<void> initialize() async {
     // 1. Request User Permissions
@@ -27,21 +30,42 @@ class NotificationService {
     // 2. Set Background handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-    // 3. Initialize Local Notifications for Foreground delivery
+    // 3. Initialize Local Notifications for Foreground delivery & click payloads
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
     const iosSettings = DarwinInitializationSettings();
-    const initSettings = InitializationSettings(android: androidSettings, iOS: iosSettings);
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      iOS: iosSettings,
+    );
 
-    await _localNotifications.initialize(initSettings);
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse response) {
+        final payload = response.payload;
+        if (payload != null && payload.isNotEmpty) {
+          onNotificationTap?.call(payload);
+        }
+      },
+    );
 
     // 4. Listen to foreground FCM messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       final notification = message.notification;
       if (notification != null) {
-        _showLocalNotification(
-          title: notification.title ?? 'Healthcare App Update',
+        final routePayload = message.data['payload'] as String? ?? '';
+        showLocalNotification(
+          title: notification.title ?? 'MediCare Update',
           body: notification.body ?? '',
+          payload: routePayload,
         );
+      }
+    });
+
+    // 5. Handle background FCM notification tap
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      final routePayload = message.data['payload'] as String? ?? '';
+      if (routePayload.isNotEmpty) {
+        onNotificationTap?.call(routePayload);
       }
     });
   }
@@ -58,26 +82,31 @@ class NotificationService {
     }
   }
 
-  Future<void> _showLocalNotification({
+  Future<void> showLocalNotification({
     required String title,
     required String body,
+    String? payload,
   }) async {
     const androidDetails = AndroidNotificationDetails(
       'healthcare_appointment_channel',
-      'Appointment Notifications',
-      channelDescription: 'Updates for appointment confirmations, reminders, and prescription arrivals.',
+      'Healthcare Updates & Verifications',
+      channelDescription:
+          'Notifications for doctor verification requests, appointment updates, and prescriptions.',
       importance: Importance.max,
       priority: Priority.high,
     );
     const iosDetails = DarwinNotificationDetails();
-    const notificationDetails = NotificationDetails(android: androidDetails, iOS: iosDetails);
+    const notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
 
     await _localNotifications.show(
-      DateTime.now().millisecond,
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
       title,
       body,
       notificationDetails,
+      payload: payload,
     );
   }
 }
-

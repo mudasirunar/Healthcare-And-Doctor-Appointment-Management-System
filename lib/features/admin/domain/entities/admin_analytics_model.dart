@@ -11,6 +11,7 @@ class AdminAnalyticsModel {
   final int upcomingAppointments;
   final int completedAppointments;
   final int cancelledAppointments;
+  final int totalPrescriptions;
   final double avgConsultationFee;
   final double minConsultationFee;
   final double maxConsultationFee;
@@ -31,6 +32,7 @@ class AdminAnalyticsModel {
     this.upcomingAppointments = 0,
     required this.completedAppointments,
     required this.cancelledAppointments,
+    this.totalPrescriptions = 0,
     this.avgConsultationFee = 0.0,
     this.minConsultationFee = 0.0,
     this.maxConsultationFee = 0.0,

@@ -25,6 +25,22 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
   final _reasonController = TextEditingController();
   bool _isSubmitting = false;
   String? _conflictError;
+  final List<GlobalKey> _dateKeys = List.generate(14, (_) => GlobalKey());
+
+  void _centerSelectedDate(int index) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final ctx = _dateKeys[index].currentContext;
+      if (ctx != null) {
+        Scrollable.ensureVisible(
+          ctx,
+          alignment: 0.5,
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeOutCubic,
+        );
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -295,62 +311,75 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Date Picker Strip (14 days)
+                // Date Picker Strip (14 days, auto-centers selected date)
                 const Text('Select Date', style: AppTypography.headline),
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 84,
-                  child: ListView.separated(
+                  child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
-                    itemCount: 14,
-                    separatorBuilder: (_, __) => const SizedBox(width: 8),
-                    itemBuilder: (context, index) {
-                      final day = DateTime.now().add(Duration(days: index));
-                      final isSelected = day.year == _selectedDate.year &&
-                          day.month == _selectedDate.month &&
-                          day.day == _selectedDate.day;
+                    child: Row(
+                      children: List.generate(14, (index) {
+                        final day = DateTime.now().add(Duration(days: index));
+                        final isSelected = day.year == _selectedDate.year &&
+                            day.month == _selectedDate.month &&
+                            day.day == _selectedDate.day;
 
-                      return InkWell(
-                        onTap: () {
-                          setState(() {
-                            _selectedDate = day;
-                            _selectedSlotUtc = null;
-                            _conflictError = null;
-                          });
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          width: 68,
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          decoration: BoxDecoration(
-                            color: isSelected ? AppColors.primary : AppColors.surface,
+                        return Padding(
+                          key: _dateKeys[index],
+                          padding: EdgeInsets.only(right: index == 13 ? 0 : 8),
+                          child: InkWell(
+                            onTap: () {
+                              setState(() {
+                                _selectedDate = day;
+                                _selectedSlotUtc = null;
+                                _conflictError = null;
+                              });
+                              _centerSelectedDate(index);
+                            },
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected ? AppColors.primary : AppColors.border,
-                              width: isSelected ? 1.5 : 1,
+                            child: Container(
+                              width: 68,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? AppColors.primary
+                                    : AppColors.surface,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : AppColors.border,
+                                  width: isSelected ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    DateFormat('EEE').format(day),
+                                    style: AppTypography.caption.copyWith(
+                                      color: isSelected
+                                          ? Colors.white70
+                                          : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    DateFormat('d').format(day),
+                                    style: AppTypography.headline.copyWith(
+                                      color: isSelected
+                                          ? Colors.white
+                                          : AppColors.textPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                DateFormat('EEE').format(day),
-                                style: AppTypography.caption.copyWith(
-                                  color: isSelected ? Colors.white70 : AppColors.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                DateFormat('d').format(day),
-                                style: AppTypography.headline.copyWith(
-                                  color: isSelected ? Colors.white : AppColors.textPrimary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+                        );
+                      }),
+                    ),
                   ),
                 ),
                 const SizedBox(height: 24),

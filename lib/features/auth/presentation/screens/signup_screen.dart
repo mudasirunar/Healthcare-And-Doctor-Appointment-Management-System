@@ -117,9 +117,11 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     final specialtiesAsync = ref.watch(specialtiesProvider);
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textSecondary = AppColors.textSecondaryOf(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundOf(context),
       appBar: AppBar(
         title: const Text('Create Account'),
       ),
@@ -138,8 +140,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: AppColors.surfaceVariant,
+                        color: AppColors.surfaceVariantOf(context),
                         borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.borderOf(context)),
                       ),
                       child: Row(
                         children: [
@@ -168,9 +171,9 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.errorLight,
+                          color: AppColors.errorLightOf(context),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                          border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                         ),
                         child: Text(
                           _errorMessage!,
@@ -183,6 +186,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     // Full Name
                     TextFormField(
                       controller: _nameController,
+                      style: TextStyle(color: textPrimary),
                       decoration: InputDecoration(
                         labelText: _selectedRole == UserRole.doctor ? 'Doctor Full Name (e.g. Dr. John Doe)' : 'Full Name',
                         prefixIcon: const Icon(Icons.person_outline_rounded),
@@ -195,6 +199,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     TextFormField(
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
+                      style: TextStyle(color: textPrimary),
                       decoration: const InputDecoration(
                         labelText: 'Email Address',
                         prefixIcon: Icon(Icons.email_outlined),
@@ -211,13 +216,14 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     TextFormField(
                       controller: _passwordController,
                       obscureText: _obscurePassword,
+                      style: TextStyle(color: textPrimary),
                       decoration: InputDecoration(
                         labelText: 'Password',
                         prefixIcon: const Icon(Icons.lock_outline_rounded),
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                            color: AppColors.textMuted,
+                            color: AppColors.textMutedOf(context),
                           ),
                           onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                         ),
@@ -230,6 +236,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     TextFormField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
+                      style: TextStyle(color: textPrimary),
                       decoration: const InputDecoration(
                         labelText: 'Phone Number',
                         prefixIcon: Icon(Icons.phone_outlined),
@@ -239,13 +246,18 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                     // --- Patient Specific Details ---
                     if (_selectedRole == UserRole.patient) ...[
-                      const Text('Health Profile (Optional)', style: AppTypography.headline),
+                      Text(
+                        'Health Profile (Optional)',
+                        style: AppTypography.headline.copyWith(color: textPrimary),
+                      ),
                       const SizedBox(height: 12),
                       Row(
                         children: [
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               value: _selectedGender,
+                              dropdownColor: AppColors.surfaceOf(context),
+                              style: AppTypography.bodyLarge.copyWith(color: textPrimary),
                               decoration: const InputDecoration(labelText: 'Gender'),
                               items: const [
                                 DropdownMenuItem(value: 'Female', child: Text('Female')),
@@ -259,6 +271,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                           Expanded(
                             child: DropdownButtonFormField<String>(
                               value: _selectedBloodGroup,
+                              dropdownColor: AppColors.surfaceOf(context),
+                              style: AppTypography.bodyLarge.copyWith(color: textPrimary),
                               decoration: const InputDecoration(labelText: 'Blood Group'),
                               items: const [
                                 DropdownMenuItem(value: 'A+', child: Text('A+')),
@@ -278,6 +292,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _allergiesController,
+                        style: TextStyle(color: textPrimary),
                         decoration: const InputDecoration(
                           labelText: 'Medical Allergies / Pre-existing conditions',
                           prefixIcon: Icon(Icons.warning_amber_rounded),
@@ -287,7 +302,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
                     // --- Doctor Specific Details ---
                     if (_selectedRole == UserRole.doctor) ...[
-                      const Text('Professional Credentials', style: AppTypography.headline),
+                      Text(
+                        'Professional Credentials',
+                        style: AppTypography.headline.copyWith(color: textPrimary),
+                      ),
                       const SizedBox(height: 12),
                       specialtiesAsync.when(
                         data: (specialties) {
@@ -297,6 +315,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                           }
                           return DropdownButtonFormField<String>(
                             value: _selectedSpecialtyId,
+                            dropdownColor: AppColors.surfaceOf(context),
+                            style: AppTypography.bodyLarge.copyWith(color: textPrimary),
                             decoration: const InputDecoration(labelText: 'Specialization'),
                             items: specialties.map((s) {
                               return DropdownMenuItem(value: s.id, child: Text(s.name));
@@ -316,6 +336,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: _licenseController,
+                        style: TextStyle(color: textPrimary),
                         decoration: const InputDecoration(
                           labelText: 'Medical License Registration No.',
                           prefixIcon: Icon(Icons.badge_outlined),
@@ -329,6 +350,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                             child: TextFormField(
                               controller: _experienceController,
                               keyboardType: TextInputType.number,
+                              style: TextStyle(color: textPrimary),
                               decoration: const InputDecoration(labelText: 'Years of Exp.'),
                               validator: (v) => (v == null || v.isEmpty) ? 'Required' : null,
                             ),
@@ -338,6 +360,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                             child: TextFormField(
                               controller: _feeController,
                               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                              style: TextStyle(color: textPrimary),
                               decoration: const InputDecoration(
                                 labelText: 'Fee (USD)',
                                 prefixText: '\$ ',
@@ -351,6 +374,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                       TextFormField(
                         controller: _bioController,
                         maxLines: 3,
+                        style: TextStyle(color: textPrimary),
                         decoration: const InputDecoration(
                           labelText: 'Professional Bio & Education',
                           hintText: 'Brief summary of clinical background...',
@@ -378,7 +402,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Text('Already have an account?', style: AppTypography.bodyMedium),
+                        Text(
+                          'Already have an account?',
+                          style: AppTypography.bodyMedium.copyWith(color: textSecondary),
+                        ),
                         TextButton(
                           onPressed: () => context.pop(),
                           child: const Text('Sign In'),
@@ -411,6 +438,10 @@ class _RoleTabButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppColors.isDark(context);
+    final activeColor = isDark ? const Color(0xFF38BDF8) : AppColors.primary;
+    final inactiveColor = AppColors.textSecondaryOf(context);
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
@@ -418,7 +449,7 @@ class _RoleTabButton extends StatelessWidget {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.surface : Colors.transparent,
+          color: isSelected ? AppColors.surfaceOf(context) : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           boxShadow: isSelected
               ? [
@@ -436,13 +467,13 @@ class _RoleTabButton extends StatelessWidget {
             Icon(
               icon,
               size: 18,
-              color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              color: isSelected ? activeColor : inactiveColor,
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: AppTypography.button.copyWith(
-                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                color: isSelected ? activeColor : inactiveColor,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
             ),

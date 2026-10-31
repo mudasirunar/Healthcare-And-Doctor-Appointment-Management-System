@@ -9,6 +9,12 @@ import '../../features/patient/presentation/screens/patient_appointments_screen.
 import '../../features/doctor/presentation/screens/doctor_main_screen.dart';
 import '../../features/doctor/presentation/screens/doctor_availability_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
+import '../../features/admin/presentation/screens/admin_notifications_screen.dart';
+import '../../features/admin/presentation/screens/admin_doctor_detail_screen.dart';
+import '../../features/admin/presentation/screens/admin_patient_detail_screen.dart';
+import '../../features/admin/presentation/screens/admin_appointment_detail_screen.dart';
+import '../../features/admin/presentation/screens/admin_specialties_screen.dart';
+import '../../features/admin/presentation/screens/admin_analytics_screen.dart';
 import '../../features/consultation/presentation/screens/video_consultation_screen.dart';
 import '../../features/consultation/presentation/screens/appointment_chat_screen.dart';
 import '../../features/consultation/presentation/screens/prescription_viewer_screen.dart';
@@ -61,6 +67,39 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/admin/dashboard',
       builder: (context, state) => const AdminDashboardScreen(),
+    ),
+    GoRoute(
+      path: '/admin/notifications',
+      builder: (context, state) => const AdminNotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/admin/specialties',
+      builder: (context, state) => const AdminSpecialtiesScreen(),
+    ),
+    GoRoute(
+      path: '/admin/analytics',
+      builder: (context, state) => const AdminAnalyticsScreen(),
+    ),
+    GoRoute(
+      path: '/admin/doctor/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id'] ?? '';
+        return AdminDoctorDetailScreen(doctorId: id);
+      },
+    ),
+    GoRoute(
+      path: '/admin/patient/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id'] ?? '';
+        return AdminPatientDetailScreen(patientId: id);
+      },
+    ),
+    GoRoute(
+      path: '/admin/appointment/:id',
+      builder: (context, state) {
+        final id = state.pathParameters['id'] ?? '';
+        return AdminAppointmentDetailScreen(appointmentId: id);
+      },
     ),
     GoRoute(
       path: '/consultation/room/:appointmentId',

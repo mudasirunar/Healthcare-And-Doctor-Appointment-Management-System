@@ -64,14 +64,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reset Password', style: AppTypography.headline),
+        title: Text(
+          'Reset Password',
+          style: AppTypography.headline.copyWith(
+            color: AppColors.textPrimaryOf(ctx),
+          ),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Enter your registered email address to receive password reset instructions.',
-              style: AppTypography.bodyMedium,
+              style: AppTypography.bodyMedium.copyWith(
+                color: AppColors.textSecondaryOf(ctx),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -125,8 +132,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = AppColors.isDark(context);
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textSecondary = AppColors.textSecondaryOf(context);
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.backgroundOf(context),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -138,33 +149,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Brand Header
+                    // Brand Header (same icon badge as SplashScreen)
                     Center(
                       child: Container(
-                        width: 72,
-                        height: 72,
+                        width: 88,
+                        height: 88,
+                        alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          color: AppColors.primaryLight,
-                          borderRadius: BorderRadius.circular(18),
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(26),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.withValues(
+                                alpha: isDark ? 0.35 : 0.25,
+                              ),
+                              blurRadius: 28,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
                         ),
                         child: const Icon(
-                          Icons.local_hospital_rounded,
-                          size: 40,
-                          color: AppColors.primary,
+                          Icons.health_and_safety_rounded,
+                          size: 46,
+                          color: Colors.white,
                         ),
                       ),
                     ),
                     const SizedBox(height: 20),
-                    const Text(
+                    Text(
                       'Healthcare App',
                       textAlign: TextAlign.center,
-                      style: AppTypography.display,
+                      style: AppTypography.display.copyWith(color: textPrimary),
                     ),
                     const SizedBox(height: 6),
                     Text(
                       'Doctor Appointment & Consultation System',
                       textAlign: TextAlign.center,
-                      style: AppTypography.subtitle.copyWith(color: AppColors.textSecondary),
+                      style: AppTypography.subtitle.copyWith(color: textSecondary),
                     ),
                     const SizedBox(height: 32),
 
@@ -173,9 +194,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: AppColors.errorLight,
+                          color: AppColors.errorLightOf(context),
                           borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: AppColors.error.withOpacity(0.3)),
+                          border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           children: [
@@ -198,6 +219,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       controller: _emailController,
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
+                      style: TextStyle(color: textPrimary),
                       decoration: const InputDecoration(
                         labelText: 'Email Address',
                         prefixIcon: Icon(Icons.email_outlined),
@@ -219,6 +241,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       controller: _passwordController,
                       obscureText: _obscurePassword,
                       textInputAction: TextInputAction.done,
+                      style: TextStyle(color: textPrimary),
                       onFieldSubmitted: (_) => _handleLogin(),
                       decoration: InputDecoration(
                         labelText: 'Password',
@@ -226,7 +249,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         suffixIcon: IconButton(
                           icon: Icon(
                             _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                            color: AppColors.textMuted,
+                            color: AppColors.textMutedOf(context),
                           ),
                           onPressed: () {
                             setState(() {
@@ -275,7 +298,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       children: [
                         Text(
                           "Don't have an account?",
-                          style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+                          style: AppTypography.bodyMedium.copyWith(color: textSecondary),
                         ),
                         TextButton(
                           onPressed: () => context.push('/signup'),
