@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
@@ -46,46 +47,41 @@ class AdminVerificationsScreen extends ConsumerWidget {
     final reasonCtrl = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          'Decline Credentials',
-          style: AppTypography.headline.copyWith(
-            color: AppColors.textPrimaryOf(ctx),
+      builder: (ctx) => AppDialog(
+        icon: Icons.gpp_bad_outlined,
+        tone: AppDialogTone.destructive,
+        title: 'Decline Credentials',
+        message: 'Provide a verification note for ${doc.doctorName}:',
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: TextField(
+            controller: reasonCtrl,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'Rejection Reason',
+              hintText: 'Enter verification notes...',
+            ),
           ),
         ),
-        content: TextField(
-          controller: reasonCtrl,
-          maxLines: 2,
-          decoration: const InputDecoration(
-            labelText: 'Rejection Reason',
-            hintText: 'Enter verification notes...',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final reason = reasonCtrl.text.trim();
-              if (reason.isEmpty) return;
-              Navigator.pop(ctx);
-              AppSnackBar.showWarning(
-                context,
-                '${doc.doctorName} verification declined.',
+        cancelLabel: 'Cancel',
+        onCancel: () => Navigator.pop(ctx),
+        confirmLabel: 'Decline',
+        confirmIsDestructive: true,
+        onConfirm: () async {
+          final reason = reasonCtrl.text.trim();
+          if (reason.isEmpty) return;
+          Navigator.pop(ctx);
+          AppSnackBar.showWarning(
+            context,
+            '${doc.doctorName} verification declined.',
+          );
+          await ref.read(doctorRepositoryProvider).updateVerificationStatus(
+                doc.id,
+                VerificationStatus.rejected,
+                reason,
               );
-              await ref.read(doctorRepositoryProvider).updateVerificationStatus(
-                    doc.id,
-                    VerificationStatus.rejected,
-                    reason,
-                  );
-              ref.invalidate(filteredDoctorsProvider);
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Decline'),
-          ),
-        ],
+          ref.invalidate(filteredDoctorsProvider);
+        },
       ),
     );
   }

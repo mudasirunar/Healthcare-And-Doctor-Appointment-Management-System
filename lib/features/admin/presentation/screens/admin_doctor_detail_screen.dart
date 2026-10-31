@@ -5,6 +5,7 @@ import '../../../../core/services/user_notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
@@ -57,86 +58,69 @@ class AdminDoctorDetailScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) => AlertDialog(
-          title: Text(
-            'Reassign Department',
-            style: AppTypography.headline.copyWith(
-              color: AppColors.textPrimaryOf(ctx),
-            ),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Select new medical department for Dr. ${doctor.doctorName}:',
-                style: AppTypography.bodyMedium.copyWith(
-                  color: AppColors.textSecondaryOf(ctx),
-                ),
+        builder: (ctx, setModalState) => AppDialog(
+          icon: Icons.swap_horiz_rounded,
+          tone: AppDialogTone.primary,
+          title: 'Reassign Department',
+          message:
+              'Select a new clinical department for Dr. ${doctor.doctorName}:',
+          content: Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: DropdownButtonFormField<String>(
+              value: specialties.any((s) => s.id == selectedId)
+                  ? selectedId
+                  : specialties.first.id,
+              decoration: const InputDecoration(
+                labelText: 'Department',
+                prefixIcon: Icon(Icons.grid_view_rounded),
               ),
-              const SizedBox(height: 14),
-              DropdownButtonFormField<String>(
-                value: specialties.any((s) => s.id == selectedId)
-                    ? selectedId
-                    : specialties.first.id,
-                decoration: const InputDecoration(
-                  labelText: 'Department',
-                  prefixIcon: Icon(Icons.grid_view_rounded),
-                ),
-                items: specialties.map((s) {
-                  return DropdownMenuItem<String>(
-                    value: s.id,
-                    child: Text(s.name),
-                  );
-                }).toList(),
-                onChanged: (val) {
-                  if (val != null) {
-                    final matched = specialties.firstWhere((s) => s.id == val);
-                    setModalState(() {
-                      selectedId = matched.id;
-                      selectedName = matched.name;
-                    });
-                  }
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                Navigator.pop(ctx);
-                final updated = doctor.copyWith(
-                  specialtyId: selectedId,
-                  specialtyName: selectedName,
+              items: specialties.map((s) {
+                return DropdownMenuItem<String>(
+                  value: s.id,
+                  child: Text(s.name),
                 );
-                await ref
-                    .read(doctorRepositoryProvider)
-                    .updateDoctorProfile(updated);
-                ref.invalidate(allDoctorsAdminProvider);
-                ref.invalidate(filteredDoctorsProvider);
-
-                UserNotificationService.instance.sendDoctorNotification(
-                  doctorUserId: doctor.userId,
-                  title: 'Specialty Department Reassigned',
-                  body:
-                      'Hospital administration reassigned your specialty to $selectedName.',
-                  type: 'specialty_reassigned',
-                );
-
-                if (context.mounted) {
-                  AppSnackBar.showSuccess(
-                    context,
-                    'Dr. ${doctor.doctorName} reassigned to $selectedName.',
-                  );
+              }).toList(),
+              onChanged: (val) {
+                if (val != null) {
+                  final matched = specialties.firstWhere((s) => s.id == val);
+                  setModalState(() {
+                    selectedId = matched.id;
+                    selectedName = matched.name;
+                  });
                 }
               },
-              child: const Text('Reassign'),
             ),
-          ],
+          ),
+          cancelLabel: 'Cancel',
+          onCancel: () => Navigator.pop(ctx),
+          confirmLabel: 'Reassign',
+          onConfirm: () async {
+            Navigator.pop(ctx);
+            final updated = doctor.copyWith(
+              specialtyId: selectedId,
+              specialtyName: selectedName,
+            );
+            await ref
+                .read(doctorRepositoryProvider)
+                .updateDoctorProfile(updated);
+            ref.invalidate(allDoctorsAdminProvider);
+            ref.invalidate(filteredDoctorsProvider);
+
+            UserNotificationService.instance.sendDoctorNotification(
+              doctorUserId: doctor.userId,
+              title: 'Specialty Department Reassigned',
+              body:
+                  'Hospital administration reassigned your specialty to $selectedName.',
+              type: 'specialty_reassigned',
+            );
+
+            if (context.mounted) {
+              AppSnackBar.showSuccess(
+                context,
+                'Dr. ${doctor.doctorName} reassigned to $selectedName.',
+              );
+            }
+          },
         ),
       ),
     );
@@ -149,57 +133,38 @@ class AdminDoctorDetailScreen extends ConsumerWidget {
   ) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: AppColors.error),
-            const SizedBox(width: 8),
-            Text(
-              'Remove Doctor?',
-              style: AppTypography.headline.copyWith(
-                color: AppColors.textPrimaryOf(ctx),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to remove Dr. ${doctor.doctorName} (License: ${doctor.licenseNumber}) from the hospital registry? All active slot registrations will be removed.',
-          style: AppTypography.bodyMedium.copyWith(
-            color: AppColors.textSecondaryOf(ctx),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await ref.read(doctorRepositoryProvider).deleteDoctor(doctor.id);
-              ref.invalidate(allDoctorsAdminProvider);
-              ref.invalidate(filteredDoctorsProvider);
+      builder: (ctx) => AppDialog(
+        icon: Icons.delete_outline_rounded,
+        tone: AppDialogTone.destructive,
+        title: 'Remove Doctor?',
+        message:
+            'Are you sure you want to remove Dr. ${doctor.doctorName} (License: ${doctor.licenseNumber}) from the hospital registry? All active slot registrations will be removed.',
+        cancelLabel: 'Cancel',
+        onCancel: () => Navigator.pop(ctx),
+        confirmLabel: 'Remove Doctor',
+        confirmIsDestructive: true,
+        onConfirm: () async {
+          Navigator.pop(ctx);
+          await ref.read(doctorRepositoryProvider).deleteDoctor(doctor.id);
+          ref.invalidate(allDoctorsAdminProvider);
+          ref.invalidate(filteredDoctorsProvider);
 
-              UserNotificationService.instance.sendDoctorNotification(
-                doctorUserId: doctor.userId,
-                title: 'Account Removed from Registry',
-                body:
-                    'Your specialist profile was removed from the active directory by hospital administration.',
-                type: 'doctor_removed',
-              );
+          UserNotificationService.instance.sendDoctorNotification(
+            doctorUserId: doctor.userId,
+            title: 'Account Removed from Registry',
+            body:
+                'Your specialist profile was removed from the active directory by hospital administration.',
+            type: 'doctor_removed',
+          );
 
-              if (context.mounted) {
-                AppSnackBar.showSuccess(
-                  context,
-                  'Dr. ${doctor.doctorName} removed from registry.',
-                );
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Remove Doctor'),
-          ),
-        ],
+          if (context.mounted) {
+            AppSnackBar.showSuccess(
+              context,
+              'Dr. ${doctor.doctorName} removed from registry.',
+            );
+            Navigator.pop(context);
+          }
+        },
       ),
     );
   }
@@ -212,59 +177,39 @@ class AdminDoctorDetailScreen extends ConsumerWidget {
     final reasonCtrl = TextEditingController(text: doctor.verificationNotes);
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          'Decline Credentials',
-          style: AppTypography.headline.copyWith(
-            color: AppColors.textPrimaryOf(ctx),
+      builder: (ctx) => AppDialog(
+        icon: Icons.gpp_bad_outlined,
+        tone: AppDialogTone.destructive,
+        title: 'Decline Credentials',
+        message: 'Provide a reason for declining Dr. ${doctor.doctorName}:',
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: TextField(
+            controller: reasonCtrl,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText: 'Reason',
+              hintText:
+                  'e.g. Medical board license number could not be verified',
+            ),
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Provide a reason for declining ${doctor.doctorName}:',
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondaryOf(ctx),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: reasonCtrl,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Reason',
-                hintText: 'e.g. Medical board license number could not be verified',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final reason = reasonCtrl.text.trim();
-              if (reason.isEmpty) return;
-              Navigator.pop(ctx);
-              await _updateStatus(
-                context,
-                ref,
-                doctor,
-                VerificationStatus.rejected,
-                reason,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              minimumSize: const Size(110, 42),
-            ),
-            child: const Text('Decline'),
-          ),
-        ],
+        cancelLabel: 'Cancel',
+        onCancel: () => Navigator.pop(ctx),
+        confirmLabel: 'Decline',
+        confirmIsDestructive: true,
+        onConfirm: () async {
+          final reason = reasonCtrl.text.trim();
+          if (reason.isEmpty) return;
+          Navigator.pop(ctx);
+          await _updateStatus(
+            context,
+            ref,
+            doctor,
+            VerificationStatus.rejected,
+            reason,
+          );
+        },
       ),
     );
   }

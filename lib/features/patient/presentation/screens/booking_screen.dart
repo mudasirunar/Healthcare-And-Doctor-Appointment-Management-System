@@ -7,6 +7,7 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
@@ -156,26 +157,17 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         showDialog(
           context: context,
           barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            title: Row(
-              children: const [
-                Icon(Icons.check_circle_rounded, color: AppColors.success, size: 28),
-                SizedBox(width: 10),
-                Text('Booking Successful!'),
-              ],
-            ),
-            content: Text(
-              'Your appointment request (#${appointment.id}) has been submitted to ${doctor.doctorName}. You can track status changes in My Appointments.',
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  context.go('/patient/appointments');
-                },
-                child: const Text('View Appointments'),
-              ),
-            ],
+          builder: (ctx) => AppDialog(
+            icon: Icons.check_circle_rounded,
+            tone: AppDialogTone.success,
+            title: 'Booking Successful!',
+            message:
+                'Your appointment request (#${appointment.id}) has been submitted to ${doctor.doctorName}. You can track status changes in My Appointments.',
+            confirmLabel: 'View Appointments',
+            onConfirm: () {
+              Navigator.pop(ctx);
+              context.go('/patient/appointments');
+            },
           ),
         );
       }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -61,56 +62,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   void _showForgotPasswordDialog() {
-    final resetEmailController = TextEditingController(text: _emailController.text);
+    final resetEmailController =
+        TextEditingController(text: _emailController.text);
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          'Reset Password',
-          style: AppTypography.headline.copyWith(
-            color: AppColors.textPrimaryOf(ctx),
+      builder: (ctx) => AppDialog(
+        icon: Icons.lock_reset_rounded,
+        tone: AppDialogTone.primary,
+        title: 'Reset Password',
+        message:
+            'Enter your registered email address to receive password reset instructions.',
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: TextField(
+            controller: resetEmailController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: const InputDecoration(
+              labelText: 'Email Address',
+              prefixIcon: Icon(Icons.email_outlined),
+            ),
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Enter your registered email address to receive password reset instructions.',
-              style: AppTypography.bodyMedium.copyWith(
-                color: AppColors.textSecondaryOf(ctx),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: resetEmailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(
-                labelText: 'Email Address',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final email = resetEmailController.text.trim();
-              if (email.isEmpty) return;
-              Navigator.pop(ctx);
-              AppSnackBar.showSuccess(
-                context,
-                'Password reset instructions sent to $email.',
-              );
-            },
-            style: ElevatedButton.styleFrom(minimumSize: const Size(100, 42)),
-            child: const Text('Send Link'),
-          ),
-        ],
+        cancelLabel: 'Cancel',
+        onCancel: () => Navigator.pop(ctx),
+        confirmLabel: 'Send Link',
+        onConfirm: () {
+          final email = resetEmailController.text.trim();
+          if (email.isEmpty) return;
+          Navigator.pop(ctx);
+          AppSnackBar.showSuccess(
+            context,
+            'Password reset instructions sent to $email.',
+          );
+        },
       ),
     );
   }

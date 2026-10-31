@@ -5,6 +5,7 @@ import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import 'admin_appointments_screen.dart';
 import 'admin_directory_screen.dart';
@@ -94,33 +95,16 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   Future<void> _confirmSignOut() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          'Sign Out?',
-          style: AppTypography.headline.copyWith(
-            color: AppColors.textPrimaryOf(ctx),
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to sign out of your account?',
-          style: AppTypography.bodyMedium.copyWith(
-            color: AppColors.textSecondaryOf(ctx),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Stay Signed In'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              minimumSize: const Size(120, 42),
-            ),
-            child: const Text('Sign Out'),
-          ),
-        ],
+      builder: (ctx) => AppDialog(
+        icon: Icons.logout_rounded,
+        tone: AppDialogTone.destructive,
+        title: 'Sign Out?',
+        message: 'Are you sure you want to sign out of your account?',
+        cancelLabel: 'Stay Signed In',
+        onCancel: () => Navigator.pop(ctx, false),
+        confirmLabel: 'Sign Out',
+        confirmIsDestructive: true,
+        onConfirm: () => Navigator.pop(ctx, true),
       ),
     );
 

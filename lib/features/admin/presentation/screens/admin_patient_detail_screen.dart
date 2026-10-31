@@ -5,6 +5,7 @@ import '../../../../core/services/user_notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../auth/domain/entities/user_model.dart';
@@ -28,58 +29,39 @@ class AdminPatientDetailScreen extends ConsumerWidget {
   ) {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.warning_amber_rounded, color: AppColors.error),
-            const SizedBox(width: 8),
-            Text(
-              'Remove Patient?',
-              style: AppTypography.headline.copyWith(
-                color: AppColors.textPrimaryOf(ctx),
-              ),
-            ),
-          ],
-        ),
-        content: Text(
-          'Are you sure you want to remove ${patient.displayName} from hospital records? This action cannot be undone.',
-          style: AppTypography.bodyMedium.copyWith(
-            color: AppColors.textSecondaryOf(ctx),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await ref
-                  .read(authRepositoryProvider)
-                  .deletePatientRecord(patient.id);
-              ref.invalidate(allPatientsAdminProvider);
+      builder: (ctx) => AppDialog(
+        icon: Icons.delete_outline_rounded,
+        tone: AppDialogTone.destructive,
+        title: 'Remove Patient?',
+        message:
+            'Are you sure you want to remove ${patient.displayName} from hospital records? This action cannot be undone.',
+        cancelLabel: 'Cancel',
+        onCancel: () => Navigator.pop(ctx),
+        confirmLabel: 'Remove Patient',
+        confirmIsDestructive: true,
+        onConfirm: () async {
+          Navigator.pop(ctx);
+          await ref
+              .read(authRepositoryProvider)
+              .deletePatientRecord(patient.id);
+          ref.invalidate(allPatientsAdminProvider);
 
-              UserNotificationService.instance.sendPatientNotification(
-                patientUserId: patient.id,
-                title: 'Account Record Removed',
-                body:
-                    'Your patient profile was removed from hospital records by administration.',
-                type: 'patient_removed',
-              );
+          UserNotificationService.instance.sendPatientNotification(
+            patientUserId: patient.id,
+            title: 'Account Record Removed',
+            body:
+                'Your patient profile was removed from hospital records by administration.',
+            type: 'patient_removed',
+          );
 
-              if (context.mounted) {
-                AppSnackBar.showSuccess(
-                  context,
-                  'Patient ${patient.displayName} removed from records.',
-                );
-                Navigator.pop(context);
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            child: const Text('Remove Patient'),
-          ),
-        ],
+          if (context.mounted) {
+            AppSnackBar.showSuccess(
+              context,
+              'Patient ${patient.displayName} removed from records.',
+            );
+            Navigator.pop(context);
+          }
+        },
       ),
     );
   }

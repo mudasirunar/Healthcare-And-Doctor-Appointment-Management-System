@@ -5,6 +5,7 @@ import '../../../../core/services/preferences_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../domain/entities/admin_analytics_model.dart';
 import 'admin_analytics_screen.dart';
@@ -43,66 +44,59 @@ class _AdminSettingsScreenState extends ConsumerState<AdminSettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(
-          'Edit Profile',
-          style: AppTypography.headline.copyWith(
-            color: AppColors.textPrimaryOf(ctx),
+      builder: (ctx) => AppDialog(
+        icon: Icons.person_outline_rounded,
+        tone: AppDialogTone.primary,
+        title: 'Edit Profile',
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Full Name',
+                  prefixIcon: Icon(Icons.person_outline_rounded),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Phone Number',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+              ),
+            ],
           ),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Full Name',
-                prefixIcon: Icon(Icons.person_outline_rounded),
-              ),
-            ),
-            const SizedBox(height: 14),
-            TextField(
-              controller: phoneCtrl,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Phone Number',
-                prefixIcon: Icon(Icons.phone_outlined),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final newName = nameCtrl.text.trim();
-              if (newName.isEmpty) return;
-              Navigator.pop(ctx);
-              final updated = user.copyWith(
-                displayName: newName,
-                phoneNumber: phoneCtrl.text.trim().isEmpty
-                    ? null
-                    : phoneCtrl.text.trim(),
-              );
-              ref.read(currentUserProvider.notifier).state = updated;
-              if (mounted) {
-                AppSnackBar.showSuccess(context, 'Profile updated.');
-              }
-              try {
-                await ref.read(authRepositoryProvider).updateProfile(updated);
-              } catch (e) {
-                if (mounted) {
-                  AppSnackBar.showError(context, e.toString());
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(minimumSize: const Size(100, 42)),
-            child: const Text('Save'),
-          ),
-        ],
+        cancelLabel: 'Cancel',
+        onCancel: () => Navigator.pop(ctx),
+        confirmLabel: 'Save',
+        onConfirm: () async {
+          final newName = nameCtrl.text.trim();
+          if (newName.isEmpty) return;
+          Navigator.pop(ctx);
+          final updated = user.copyWith(
+            displayName: newName,
+            phoneNumber: phoneCtrl.text.trim().isEmpty
+                ? null
+                : phoneCtrl.text.trim(),
+          );
+          ref.read(currentUserProvider.notifier).state = updated;
+          if (mounted) {
+            AppSnackBar.showSuccess(context, 'Profile updated.');
+          }
+          try {
+            await ref.read(authRepositoryProvider).updateProfile(updated);
+          } catch (e) {
+            if (mounted) {
+              AppSnackBar.showError(context, e.toString());
+            }
+          }
+        },
       ),
     );
   }

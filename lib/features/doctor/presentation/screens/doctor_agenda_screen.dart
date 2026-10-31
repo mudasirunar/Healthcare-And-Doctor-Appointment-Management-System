@@ -5,6 +5,7 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
@@ -13,49 +14,45 @@ import '../../../consultation/presentation/screens/prescription_builder_dialog.d
 class DoctorAgendaScreen extends ConsumerWidget {
   const DoctorAgendaScreen({super.key});
 
-  void _showNotesDialog(BuildContext context, WidgetRef ref, AppointmentModel apt) {
-    final notesController = TextEditingController(text: apt.consultationNotes ?? '');
+  void _showNotesDialog(
+      BuildContext context, WidgetRef ref, AppointmentModel apt) {
+    final notesController =
+        TextEditingController(text: apt.consultationNotes ?? '');
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('Clinical Notes - ${apt.patientName}', style: AppTypography.headline),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Reason for visit: "${apt.reasonForVisit}"', style: AppTypography.bodyMedium),
-            const SizedBox(height: 16),
-            TextField(
-              controller: notesController,
-              maxLines: 4,
-              decoration: const InputDecoration(
-                labelText: 'Private Clinical Observations',
-                hintText: 'Enter clinical impressions, vitals, or symptoms...',
-              ),
+      builder: (ctx) => AppDialog(
+        icon: Icons.note_alt_outlined,
+        tone: AppDialogTone.primary,
+        title: 'Clinical Notes',
+        message:
+            'Patient: ${apt.patientName} • Reason: "${apt.reasonForVisit}"',
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: TextField(
+            controller: notesController,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: 'Private Clinical Observations',
+              hintText: 'Enter clinical impressions, vitals, or symptoms...',
+              alignLabelWithHint: true,
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Close'),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final user = ref.read(currentUserProvider);
-              await ref.read(appointmentRepositoryProvider).updateStatus(
+        ),
+        cancelLabel: 'Cancel',
+        onCancel: () => Navigator.pop(ctx),
+        confirmLabel: 'Save Notes',
+        onConfirm: () async {
+          Navigator.pop(ctx);
+          final user = ref.read(currentUserProvider);
+          await ref.read(appointmentRepositoryProvider).updateStatus(
                 appointmentId: apt.id,
                 targetStatus: apt.status,
                 actorUserId: user?.id ?? 'doctor',
                 note: notesController.text.trim(),
               );
-              ref.invalidate(userAppointmentsProvider);
-            },
-            child: const Text('Save Notes'),
-          ),
-        ],
+          ref.invalidate(userAppointmentsProvider);
+        },
       ),
     );
   }

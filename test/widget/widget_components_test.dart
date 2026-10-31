@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:healthcare_app/core/widgets/app_dialog.dart';
 import 'package:healthcare_app/core/widgets/state_views.dart';
 import 'package:healthcare_app/core/widgets/status_badge.dart';
 import 'package:healthcare_app/features/appointment/domain/entities/appointment_model.dart';
@@ -84,6 +85,61 @@ void main() {
         find.text('Viewing offline data. Reconnect to book or reschedule appointments.'),
         findsOneWidget,
       );
+    });
+
+    testWidgets('AppDialog renders title, message, icon and handles action callbacks', (tester) async {
+      bool confirmed = false;
+      bool cancelled = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppDialog(
+              icon: Icons.delete_outline_rounded,
+              tone: AppDialogTone.destructive,
+              title: 'Remove Record?',
+              message: 'This will permanently remove the record.',
+              cancelLabel: 'Cancel',
+              onCancel: () => cancelled = true,
+              confirmLabel: 'Delete Record',
+              confirmIsDestructive: true,
+              onConfirm: () => confirmed = true,
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('Remove Record?'), findsOneWidget);
+      expect(find.text('This will permanently remove the record.'), findsOneWidget);
+      expect(find.byIcon(Icons.delete_outline_rounded), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+      expect(find.text('Delete Record'), findsOneWidget);
+
+      await tester.tap(find.text('Delete Record'));
+      await tester.pump();
+      expect(confirmed, isTrue);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pump();
+      expect(cancelled, isTrue);
+    });
+
+    testWidgets('AppDialog displays CircularProgressIndicator when confirmIsLoading is true', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: AppDialog(
+              title: 'Processing Request',
+              confirmLabel: 'Save',
+              confirmIsLoading: true,
+              onConfirm: () {},
+            ),
+          ),
+        ),
+      );
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      expect(find.text('Save'), findsNothing);
     });
   });
 }

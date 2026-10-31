@@ -4,6 +4,7 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
@@ -34,39 +35,36 @@ class DoctorRequestsScreen extends ConsumerWidget {
     }
   }
 
-  void _handleDecline(BuildContext context, WidgetRef ref, AppointmentModel apt) {
+  void _handleDecline(
+      BuildContext context, WidgetRef ref, AppointmentModel apt) {
     final reasonController = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Decline Appointment Request'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Are you sure you want to decline ${apt.patientName}\'s request?'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Reason for declining',
-                hintText: 'e.g. Schedule emergency...',
-              ),
+      builder: (ctx) => AppDialog(
+        icon: Icons.cancel_outlined,
+        tone: AppDialogTone.destructive,
+        title: 'Decline Appointment Request',
+        message: 'Are you sure you want to decline ${apt.patientName}\'s request?',
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: TextField(
+            controller: reasonController,
+            decoration: const InputDecoration(
+              labelText: 'Reason for declining',
+              hintText: 'e.g. Schedule emergency...',
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              final user = ref.read(currentUserProvider);
-              try {
-                await ref.read(appointmentRepositoryProvider).updateStatus(
+        ),
+        cancelLabel: 'Cancel',
+        onCancel: () => Navigator.pop(ctx),
+        confirmLabel: 'Decline',
+        confirmIsDestructive: true,
+        onConfirm: () async {
+          Navigator.pop(ctx);
+          final user = ref.read(currentUserProvider);
+          try {
+            await ref.read(appointmentRepositoryProvider).updateStatus(
                   appointmentId: apt.id,
                   targetStatus: AppointmentStatus.rejected,
                   actorUserId: user?.id ?? 'doctor',
@@ -74,22 +72,16 @@ class DoctorRequestsScreen extends ConsumerWidget {
                       ? reasonController.text.trim()
                       : 'Doctor declined request',
                 );
-                ref.invalidate(userAppointmentsProvider);
-                if (context.mounted) {
-                  AppSnackBar.showInfo(context, 'Appointment declined.');
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  AppSnackBar.showError(context, e.toString());
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-            ),
-            child: const Text('Decline'),
-          ),
-        ],
+            ref.invalidate(userAppointmentsProvider);
+            if (context.mounted) {
+              AppSnackBar.showInfo(context, 'Appointment declined.');
+            }
+          } catch (e) {
+            if (context.mounted) {
+              AppSnackBar.showError(context, e.toString());
+            }
+          }
+        },
       ),
     );
   }

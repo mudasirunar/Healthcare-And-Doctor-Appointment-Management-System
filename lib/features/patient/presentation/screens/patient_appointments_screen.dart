@@ -5,6 +5,7 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
+import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../../core/widgets/status_badge.dart';
@@ -96,24 +97,22 @@ class _AppointmentsList extends ConsumerWidget {
     required this.isUpcoming,
   });
 
-  void _showCancelDialog(BuildContext context, WidgetRef ref, AppointmentModel apt) {
-    final isEligible = DateTimeUtils.isEligibleForCancellation(apt.scheduledTimeUtc);
+  void _showCancelDialog(
+      BuildContext context, WidgetRef ref, AppointmentModel apt) {
+    final isEligible =
+        DateTimeUtils.isEligibleForCancellation(apt.scheduledTimeUtc);
 
     if (!isEligible) {
       showDialog(
         context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Cancellation Policy Alert'),
-          content: Text(
-            'Appointments can only be cancelled at least 2 hours before the scheduled time.\n\nYour appointment is scheduled in ${DateTimeUtils.hoursUntil(apt.scheduledTimeUtc).toStringAsFixed(1)} hours. Please contact customer support for emergency assistance.',
-            style: AppTypography.bodyMedium,
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Understood'),
-            ),
-          ],
+        builder: (ctx) => AppDialog(
+          icon: Icons.access_time_rounded,
+          tone: AppDialogTone.warning,
+          title: 'Cancellation Policy Alert',
+          message:
+              'Appointments can only be cancelled at least 2 hours before the scheduled time.\n\nYour appointment is scheduled in ${DateTimeUtils.hoursUntil(apt.scheduledTimeUtc).toStringAsFixed(1)} hours. Please contact customer support for emergency assistance.',
+          confirmLabel: 'Understood',
+          onConfirm: () => Navigator.pop(ctx),
         ),
       );
       return;
@@ -122,67 +121,54 @@ class _AppointmentsList extends ConsumerWidget {
     final reasonController = TextEditingController();
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Cancel Appointment'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Are you sure you want to cancel your consultation with ${apt.doctorName}?',
-              style: AppTypography.bodyMedium,
+      builder: (ctx) => AppDialog(
+        icon: Icons.event_busy_rounded,
+        tone: AppDialogTone.destructive,
+        title: 'Cancel Appointment',
+        message:
+            'Are you sure you want to cancel your consultation with ${apt.doctorName}?',
+        content: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: TextField(
+            controller: reasonController,
+            decoration: const InputDecoration(
+              labelText: 'Reason for Cancellation (Required)',
+              hintText: 'e.g. Schedule conflict...',
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Reason for Cancellation (Required)',
-                hintText: 'e.g. Schedule conflict...',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Keep Appointment'),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              final reason = reasonController.text.trim();
-              if (reason.isEmpty) return;
-              Navigator.pop(ctx);
+        ),
+        cancelLabel: 'Keep Appointment',
+        onCancel: () => Navigator.pop(ctx),
+        confirmLabel: 'Cancel Booking',
+        confirmIsDestructive: true,
+        onConfirm: () async {
+          final reason = reasonController.text.trim();
+          if (reason.isEmpty) return;
+          Navigator.pop(ctx);
 
-              try {
-                final user = ref.read(currentUserProvider);
-                await ref.read(appointmentRepositoryProvider).updateStatus(
+          try {
+            final user = ref.read(currentUserProvider);
+            await ref.read(appointmentRepositoryProvider).updateStatus(
                   appointmentId: apt.id,
                   targetStatus: AppointmentStatus.cancelled,
                   actorUserId: user?.id ?? 'patient',
                   isPatientActor: true,
                   cancellationReason: reason,
                 );
-                ref.invalidate(userAppointmentsProvider);
+            ref.invalidate(userAppointmentsProvider);
 
-                if (context.mounted) {
-                  AppSnackBar.showInfo(
-                    context,
-                    'Appointment cancelled successfully.',
-                  );
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  AppSnackBar.showError(context, e.toString());
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              minimumSize: const Size(110, 42),
-            ),
-            child: const Text('Cancel Booking'),
-          ),
-        ],
+            if (context.mounted) {
+              AppSnackBar.showInfo(
+                context,
+                'Appointment cancelled successfully.',
+              );
+            }
+          } catch (e) {
+            if (context.mounted) {
+              AppSnackBar.showError(context, e.toString());
+            }
+          }
+        },
       ),
     );
   }
