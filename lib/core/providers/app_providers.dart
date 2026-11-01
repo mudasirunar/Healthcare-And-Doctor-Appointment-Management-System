@@ -77,6 +77,35 @@ final unreadPatientNotificationsCountProvider = Provider<int>((ref) {
   return asyncVal.valueOrNull?.where((n) => !n.isRead).length ?? 0;
 });
 
+// --- NAVIGATION STATE TABS (RESETTABLE ON LOGOUT / LOGIN) ---
+final adminSelectedTabProvider = StateProvider<int>((ref) => 0);
+final patientSelectedTabProvider = StateProvider<int>((ref) => 0);
+final doctorSelectedTabProvider = StateProvider<int>((ref) => 0);
+
+/// Central sign-out routine: clears auth, resets all tab indices to 0, and invalidates stream providers
+Future<void> appSignOut(WidgetRef ref) async {
+  ref.read(adminSelectedTabProvider.notifier).state = 0;
+  ref.read(patientSelectedTabProvider.notifier).state = 0;
+  ref.read(doctorSelectedTabProvider.notifier).state = 0;
+  ref.read(currentUserProvider.notifier).state = null;
+
+  try {
+    await ref.read(authRepositoryProvider).signOut();
+  } catch (e) {
+    debugPrint('Sign-out notice: $e');
+  }
+
+  // Invalidate all role-dependent providers to prevent stale permission-denied states
+  ref.invalidate(adminAnalyticsProvider);
+  ref.invalidate(allDoctorsAdminProvider);
+  ref.invalidate(allPatientsAdminProvider);
+  ref.invalidate(allAppointmentsAdminProvider);
+  ref.invalidate(allPrescriptionsAdminProvider);
+  ref.invalidate(pendingDoctorsProvider);
+  ref.invalidate(userAppointmentsProvider);
+}
+
+
 final appointmentMessagesStreamProvider =
     StreamProvider.family<List<ChatMessageModel>, String>((ref, appointmentId) {
   return FirebaseFirestore.instance
@@ -230,24 +259,39 @@ final verifiedDoctorsStreamProvider = StreamProvider<List<DoctorModel>>((ref) {
 
 // --- ADMIN LIVE DIRECTORY, APPOINTMENTS, PRESCRIPTIONS & NOTIFICATIONS ---
 final allDoctorsAdminProvider = StreamProvider<List<DoctorModel>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null || !user.isAdmin) return Stream.value(<DoctorModel>[]);
   return FirebaseFirestore.instance
       .collection('doctors')
       .snapshots()
+      .handleError((e) {
+        debugPrint('allDoctorsAdminProvider error: $e');
+      })
       .map((s) => s.docs.map((d) => DoctorModel.fromMap(d.data(), id: d.id)).toList());
 });
 
 final allPatientsAdminProvider = StreamProvider<List<UserModel>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null || !user.isAdmin) return Stream.value(<UserModel>[]);
   return FirebaseFirestore.instance
       .collection('users')
       .where('role', isEqualTo: 'patient')
       .snapshots()
+      .handleError((e) {
+        debugPrint('allPatientsAdminProvider error: $e');
+      })
       .map((s) => s.docs.map((d) => UserModel.fromMap(d.data(), id: d.id)).toList());
 });
 
 final allAppointmentsAdminProvider = StreamProvider<List<AppointmentModel>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null || !user.isAdmin) return Stream.value(<AppointmentModel>[]);
   return FirebaseFirestore.instance
       .collection('appointments')
       .snapshots()
+      .handleError((e) {
+        debugPrint('allAppointmentsAdminProvider error: $e');
+      })
       .map((s) {
         final list = s.docs
             .map((d) => AppointmentModel.fromMap(d.data(), id: d.id))
@@ -258,9 +302,14 @@ final allAppointmentsAdminProvider = StreamProvider<List<AppointmentModel>>((ref
 });
 
 final allPrescriptionsAdminProvider = StreamProvider<List<PrescriptionModel>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null || !user.isAdmin) return Stream.value(<PrescriptionModel>[]);
   return FirebaseFirestore.instance
       .collection('prescriptions')
       .snapshots()
+      .handleError((e) {
+        debugPrint('allPrescriptionsAdminProvider error: $e');
+      })
       .map((s) {
         final list = s.docs
             .map((d) => PrescriptionModel.fromMap(d.data(), id: d.id))
@@ -271,10 +320,15 @@ final allPrescriptionsAdminProvider = StreamProvider<List<PrescriptionModel>>((r
 });
 
 final pendingDoctorsProvider = StreamProvider<List<DoctorModel>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null || !user.isAdmin) return Stream.value(<DoctorModel>[]);
   return FirebaseFirestore.instance
       .collection('doctors')
       .where('verificationStatus', isEqualTo: 'pending')
       .snapshots()
+      .handleError((e) {
+        debugPrint('pendingDoctorsProvider error: $e');
+      })
       .map((s) {
         final pendingList = s.docs
             .map((d) => DoctorModel.fromMap(d.data(), id: d.id))
@@ -396,22 +450,50 @@ final adminNotificationsProvider = Provider<List<AdminNotificationItem>>((ref) {
 });
 
 final adminAnalyticsProvider = StreamProvider<AdminAnalyticsModel>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null || !user.isAdmin) {
+    return Stream.value(
+      const AdminAnalyticsModel(
+        totalPatients: 0,
+        verifiedDoctors: 0,
+        pendingVerifications: 0,
+        totalSpecialties: 0,
+        totalAppointments: 0,
+        completedAppointments: 0,
+        cancelledAppointments: 0,
+        doctorCountBySpecialtyId: {},
+      ),
+    );
+  }
+
   final firestore = FirebaseFirestore.instance;
 
-  return firestore.collection('doctors').snapshots().asyncMap((docSnap) async {
+  return firestore
+      .collection('doctors')
+      .snapshots()
+      .handleError((e) {
+        debugPrint('adminAnalyticsProvider doctors stream error: $e');
+      })
+      .asyncMap((docSnap) async {
     final allDoctors = docSnap.docs
         .map((d) => DoctorModel.fromMap(d.data(), id: d.id))
         .toList();
 
-    final specialtiesSnap = await firestore.collection('specialties').get();
-    final specialties = specialtiesSnap.docs
-        .map((d) => SpecialtyModel.fromMap(d.data(), id: d.id))
-        .toList();
+    List<SpecialtyModel> specialties = [];
+    try {
+      final specialtiesSnap = await firestore.collection('specialties').get();
+      specialties = specialtiesSnap.docs
+          .map((d) => SpecialtyModel.fromMap(d.data(), id: d.id))
+          .toList();
+    } catch (_) {}
 
-    final appointmentsSnap = await firestore.collection('appointments').get();
-    final appointments = appointmentsSnap.docs
-        .map((d) => AppointmentModel.fromMap(d.data(), id: d.id))
-        .toList();
+    List<AppointmentModel> appointments = [];
+    try {
+      final appointmentsSnap = await firestore.collection('appointments').get();
+      appointments = appointmentsSnap.docs
+          .map((d) => AppointmentModel.fromMap(d.data(), id: d.id))
+          .toList();
+    } catch (_) {}
 
     int prescriptionCount = 0;
     try {

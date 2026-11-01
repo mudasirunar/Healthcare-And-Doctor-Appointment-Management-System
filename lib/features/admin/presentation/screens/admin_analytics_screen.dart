@@ -7,7 +7,6 @@ import '../../../../core/widgets/state_views.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import '../../../doctor/domain/entities/specialty_model.dart';
 import '../../domain/entities/admin_analytics_model.dart';
-import 'admin_dashboard_screen.dart';
 import 'admin_directory_screen.dart';
 import 'admin_doctor_detail_screen.dart';
 import 'admin_specialty_doctors_screen.dart';

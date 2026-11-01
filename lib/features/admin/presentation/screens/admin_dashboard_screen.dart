@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/services/notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -13,8 +14,6 @@ import 'admin_doctor_detail_screen.dart';
 import 'admin_notifications_screen.dart';
 import 'admin_overview_screen.dart';
 import 'admin_settings_screen.dart';
-
-final adminSelectedTabProvider = StateProvider<int>((ref) => 0);
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -109,8 +108,10 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     );
 
     if (confirmed == true && mounted) {
-      await ref.read(authRepositoryProvider).signOut();
-      ref.read(currentUserProvider.notifier).state = null;
+      await appSignOut(ref);
+      if (mounted) {
+        context.go('/');
+      }
     }
   }
 

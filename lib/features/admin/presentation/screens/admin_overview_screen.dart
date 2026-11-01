@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/state_views.dart';
@@ -31,7 +32,10 @@ class AdminOverviewScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return analyticsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => ErrorStateView(message: e.toString()),
+      error: (e, _) => ErrorStateView(
+        message: e.toString(),
+        onRetry: () => ref.invalidate(adminAnalyticsProvider),
+      ),
       data: (stats) {
         final specialties = specialtiesAsync.valueOrNull ?? [];
         final textPrimary = AppColors.textPrimaryOf(context);

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -10,8 +11,6 @@ import 'patient_home_screen.dart';
 import 'patient_appointments_screen.dart';
 import 'patient_prescriptions_screen.dart';
 import 'patient_settings_screen.dart';
-
-final patientSelectedTabProvider = StateProvider<int>((ref) => 0);
 
 class PatientMainScreen extends ConsumerStatefulWidget {
   const PatientMainScreen({super.key});
@@ -71,7 +70,10 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
         confirmIsDestructive: true,
         onConfirm: () async {
           Navigator.pop(ctx);
-          await ref.read(authRepositoryProvider).signOut();
+          await appSignOut(ref);
+          if (mounted) {
+            context.go('/');
+          }
         },
       ),
     );

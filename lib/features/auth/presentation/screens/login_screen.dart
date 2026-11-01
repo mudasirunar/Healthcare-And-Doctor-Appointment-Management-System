@@ -44,6 +44,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         password: _passwordController.text,
       );
 
+      // Reset all tab selections on fresh login to guarantee opening on main/overview
+      ref.read(adminSelectedTabProvider.notifier).state = 0;
+      ref.read(patientSelectedTabProvider.notifier).state = 0;
+      ref.read(doctorSelectedTabProvider.notifier).state = 0;
+
+      // Invalidate stream providers so fresh listeners initialize for this authenticated user
+      ref.invalidate(adminAnalyticsProvider);
+      ref.invalidate(allDoctorsAdminProvider);
+      ref.invalidate(allPatientsAdminProvider);
+      ref.invalidate(allAppointmentsAdminProvider);
+      ref.invalidate(allPrescriptionsAdminProvider);
+      ref.invalidate(pendingDoctorsProvider);
+      ref.invalidate(userAppointmentsProvider);
+
       ref.read(currentUserProvider.notifier).state = user;
       if (mounted) {
         context.go('/');

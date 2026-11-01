@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:healthcare_app/core/providers/app_providers.dart';
 import 'package:healthcare_app/core/theme/app_colors.dart';
 import 'package:healthcare_app/core/theme/app_typography.dart';
@@ -16,8 +17,6 @@ class DoctorMainScreen extends ConsumerStatefulWidget {
 }
 
 class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
-  int _currentIndex = 0;
-
   final List<Widget> _pages = const [
     DoctorAgendaScreen(),
     DoctorRequestsScreen(),
@@ -29,6 +28,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final doctorRepo = ref.watch(doctorRepositoryProvider);
+    final currentIndex = ref.watch(doctorSelectedTabProvider);
 
     return Scaffold(
       body: Column(
@@ -88,15 +88,16 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
           ),
           Expanded(
             child: IndexedStack(
-              index: _currentIndex,
+              index: currentIndex,
               children: _pages,
             ),
           ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (idx) => setState(() => _currentIndex = idx),
+        selectedIndex: currentIndex,
+        onDestinationSelected: (idx) =>
+            ref.read(doctorSelectedTabProvider.notifier).state = idx,
         indicatorColor: AppColors.primaryLight,
         backgroundColor: AppColors.surface,
         destinations: const [
@@ -186,8 +187,10 @@ class _DoctorProfileTab extends ConsumerWidget {
 
                 OutlinedButton.icon(
                   onPressed: () async {
-                    await ref.read(authRepositoryProvider).signOut();
-                    ref.read(currentUserProvider.notifier).state = null;
+                    await appSignOut(ref);
+                    if (context.mounted) {
+                      context.go('/');
+                    }
                   },
                   icon: const Icon(Icons.logout_rounded, color: AppColors.error),
                   label: const Text('Sign Out', style: TextStyle(color: AppColors.error)),
