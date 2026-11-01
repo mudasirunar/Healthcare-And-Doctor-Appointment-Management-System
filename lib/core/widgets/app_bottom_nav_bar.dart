@@ -96,8 +96,8 @@ class AppBottomNavBar extends StatelessWidget {
                   onTap(index);
                 },
                 child: Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 3),
-                  padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 4),
+                  margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                  padding: const EdgeInsets.symmetric(vertical: 5, horizontal: 2),
                   decoration: BoxDecoration(
                     color: isSelected
                         ? (isDark
@@ -147,16 +147,19 @@ class AppBottomNavBar extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 3),
-                      Text(
-                        item.label,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: AppTypography.caption.copyWith(
-                          fontSize: 11,
-                          color: isSelected
-                              ? (isDark ? const Color(0xFF38BDF8) : AppColors.primary)
-                              : AppColors.textSecondaryOf(context),
-                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          item.label,
+                          maxLines: 1,
+                          style: AppTypography.caption.copyWith(
+                            fontSize: 11,
+                            letterSpacing: -0.2,
+                            color: isSelected
+                                ? (isDark ? const Color(0xFF38BDF8) : AppColors.primary)
+                                : AppColors.textSecondaryOf(context),
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                          ),
                         ),
                       ),
                     ],
