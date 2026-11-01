@@ -148,6 +148,7 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
     final textSecondary = AppColors.textSecondaryOf(context);
     final surfaceColor = AppColors.surfaceOf(context);
     final borderColor = AppColors.borderOf(context);
+    final currentUser = ref.watch(currentUserProvider);
 
     final notificationBell = _NotificationBellButton(
       unreadCount: unreadNotificationsCount,
@@ -161,25 +162,141 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
       },
     );
 
-    final (String title, String subtitle, Widget? trailing) = switch (tabIndex) {
+    final (Widget leadingContent, Widget? trailingContent) = switch (tabIndex) {
       0 => (
-          'Patient Dashboard',
-          'Appointments, Health Stats & Care',
-          notificationBell,
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.primaryLight,
+                backgroundImage: currentUser?.avatarUrl != null
+                    ? NetworkImage(currentUser!.avatarUrl!)
+                    : null,
+                child: currentUser?.avatarUrl == null
+                    ? Text(
+                        currentUser != null && currentUser.displayName.isNotEmpty
+                            ? currentUser.displayName[0].toUpperCase()
+                            : 'P',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Patient Dashboard',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w500,
+                        color: textSecondary,
+                      ),
+                    ),
+                    Text(
+                      currentUser?.displayName ?? 'Patient',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: textPrimary,
+                        letterSpacing: -0.3,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _TopBarIconButton(
+                icon: Icons.chat_outlined,
+                onTap: () => context.push('/patient/chats'),
+              ),
+              const SizedBox(width: 8),
+              notificationBell,
+            ],
+          ),
         ),
       1 => (
-          'My Consultations',
-          'Scheduled appointments & history',
-          notificationBell,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'My Consultations',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 18,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Scheduled appointments & history',
+                style: AppTypography.caption.copyWith(
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          null,
         ),
       2 => (
-          'Medical Prescriptions',
-          'Prescriptions issued by your specialists',
-          notificationBell,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Medical Prescriptions',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 18,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Prescriptions issued by your specialists',
+                style: AppTypography.caption.copyWith(
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          null,
         ),
       _ => (
-          'Account & Settings',
-          'Clinical profile, preferences & security',
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Account & Settings',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 18,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Clinical profile, preferences & security',
+                style: AppTypography.caption.copyWith(
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
           null,
         ),
     };
@@ -197,33 +314,46 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        title,
-                        style: AppTypography.headline.copyWith(
-                          fontSize: 18,
-                          color: textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: AppTypography.caption.copyWith(
-                          color: textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                ?trailing,
+                Expanded(child: leadingContent),
+                ?trailingContent,
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TopBarIconButton extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _TopBarIconButton({
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariantOf(context),
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.borderOf(context)),
+        ),
+        child: Icon(
+          icon,
+          size: 20,
+          color: textPrimary,
         ),
       ),
     );
