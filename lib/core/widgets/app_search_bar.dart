@@ -67,52 +67,54 @@ class _AppSearchBarState extends State<AppSearchBar> {
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
 
-    return Container(
-      margin: widget.margin,
-      height: 46,
-      decoration: BoxDecoration(
-        color: surfaceColor,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: borderColor, width: 1),
-      ),
-      child: Row(
-        children: [
-          const SizedBox(width: 14),
-          Icon(
-            Icons.search_rounded,
-            size: 20,
-            color: hasText ? AppColors.primary : textSecondary,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: TextField(
-              controller: _controller,
-              onChanged: widget.onChanged,
-              style: AppTypography.bodyMedium.copyWith(
-                color: textPrimary,
-                fontWeight: FontWeight.w500,
-              ),
-              decoration: InputDecoration(
-                hintText: widget.hintText,
-                hintStyle: AppTypography.bodyMedium.copyWith(
-                  color: textSecondary,
+    return Material(
+      type: MaterialType.transparency,
+      child: Container(
+        margin: widget.margin,
+        height: 46,
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor, width: 1),
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 14),
+            Icon(
+              Icons.search_rounded,
+              size: 20,
+              color: hasText ? AppColors.primary : textSecondary,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                onChanged: widget.onChanged,
+                style: AppTypography.bodyMedium.copyWith(
+                  color: textPrimary,
+                  fontWeight: FontWeight.w500,
                 ),
-                border: InputBorder.none,
-                enabledBorder: InputBorder.none,
-                focusedBorder: InputBorder.none,
-                isDense: true,
-                filled: false,
-                contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                decoration: InputDecoration(
+                  hintText: widget.hintText,
+                  hintStyle: AppTypography.bodyMedium.copyWith(
+                    color: textSecondary,
+                  ),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  isDense: true,
+                  filled: false,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                ),
               ),
             ),
-          ),
-          if (hasText)
-            GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: _handleClear,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                child: Container(
+            if (hasText)
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _handleClear,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Container(
                   width: 20,
                   height: 20,
                   decoration: BoxDecoration(
@@ -135,6 +137,7 @@ class _AppSearchBarState extends State<AppSearchBar> {
           ],
         ],
       ),
+    ),
     );
   }
 }

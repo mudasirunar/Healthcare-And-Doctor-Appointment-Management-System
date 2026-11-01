@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,8 +16,12 @@ void main() async {
   try {
     await Firebase.initializeApp();
 
-    // Initialize Push Notifications
-    await NotificationService.instance.initialize();
+    // Initialize Push Notifications (Android only, non-blocking)
+    if (!Platform.isIOS) {
+      NotificationService.instance.initialize().catchError((e) {
+        debugPrint('Notification service init notice: $e');
+      });
+    }
   } catch (e) {
     debugPrint('Firebase initialization notice: $e');
   }

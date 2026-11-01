@@ -32,7 +32,13 @@ class NotificationService {
   final Map<String, DateTime> _recentlyDispatchedBanners = {};
 
   Future<void> initialize() async {
-    // 1. Request User Permissions for FCM (iOS & Android)
+    if (Platform.isIOS) {
+      // Push notifications are not configured on iOS without an Apple Developer APNs key.
+      // Skipping on iOS prevents the app startup from hanging on APNs token retrieval.
+      return;
+    }
+
+    // 1. Request User Permissions for FCM (Android)
     await _messaging.requestPermission(
       alert: true,
       badge: true,
@@ -126,6 +132,10 @@ class NotificationService {
 
   /// Synchronizes device FCM token to Firestore so backend push dispatchers can target this user
   Future<void> _syncFcmToken(String userId, {bool isAdmin = false}) async {
+    if (Platform.isIOS) {
+      // Skip APNs/FCM token sync on iOS since APNs capability/certificates are not configured
+      return;
+    }
     try {
       final token = await getFcmToken();
       if (token != null && token.isNotEmpty) {
@@ -162,6 +172,8 @@ class NotificationService {
   /// Starts listening to real-time incoming Firestore notifications on the receiver's device
   /// and automatically displays native iOS / Android heads-up banners with sound & vibration.
   void startListeningForUser(String userId, {bool isAdmin = false}) {
+    if (Platform.isIOS) return;
+
     if (_currentListeningUserId == userId &&
         _currentListeningIsAdmin == isAdmin &&
         _userNotificationsSub != null) {

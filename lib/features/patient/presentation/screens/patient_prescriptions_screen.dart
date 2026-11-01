@@ -12,10 +12,12 @@ import '../../../consultation/presentation/screens/prescription_viewer_screen.da
 
 class PatientPrescriptionsScreen extends ConsumerStatefulWidget {
   final ScrollController? scrollController;
+  final bool isStandalone;
 
   const PatientPrescriptionsScreen({
     super.key,
     this.scrollController,
+    this.isStandalone = false,
   });
 
   @override
@@ -38,11 +40,14 @@ class _PatientPrescriptionsScreenState
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final aptRepo = ref.watch(appointmentRepositoryProvider);
+    final isStandalone =
+        widget.isStandalone || (ModalRoute.of(context)?.canPop ?? false);
+    final surfaceColor = AppColors.surfaceOf(context);
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
     final borderColor = AppColors.borderOf(context);
 
-    return Column(
+    final content = Column(
       children: [
         // Search Bar Strip
         Padding(
@@ -224,6 +229,40 @@ class _PatientPrescriptionsScreenState
         ),
       ],
     );
+
+    if (isStandalone) {
+      return Scaffold(
+        backgroundColor: AppColors.backgroundOf(context),
+        appBar: AppBar(
+          backgroundColor: surfaceColor,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            color: textPrimary,
+            onPressed: () {
+              if (Navigator.canPop(context)) {
+                Navigator.pop(context);
+              }
+            },
+          ),
+          title: Text(
+            'Digital Prescriptions',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: textPrimary,
+            ),
+          ),
+        ),
+        body: SafeArea(
+          bottom: false,
+          child: content,
+        ),
+      );
+    }
+
+    return content;
   }
 }
 

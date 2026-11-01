@@ -662,7 +662,8 @@ class PatientCareInsightsScreen extends ConsumerWidget {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const PatientPrescriptionsScreen(),
+                      builder: (_) =>
+                          const PatientPrescriptionsScreen(isStandalone: true),
                     ),
                   );
                 },
