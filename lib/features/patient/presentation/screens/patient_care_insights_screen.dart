@@ -5,10 +5,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
-import '../../../doctor/domain/entities/doctor_model.dart';
-import '../../../doctor/domain/entities/specialty_model.dart';
 import 'booking_screen.dart';
 import 'doctor_details_screen.dart';
+import 'patient_doctors_screen.dart';
 import 'patient_prescriptions_screen.dart';
 import 'patient_specialties_screen.dart';
 import 'patient_specialty_doctors_screen.dart';
@@ -682,6 +681,24 @@ class PatientCareInsightsScreen extends ConsumerWidget {
                     context,
                     MaterialPageRoute(
                       builder: (_) => const PatientSpecialtiesScreen(),
+                    ),
+                  );
+                },
+              ),
+              Divider(height: 1, indent: 70, endIndent: 20, color: borderColor),
+
+              _FlatNavigationRow(
+                icon: Icons.person_search_rounded,
+                title: 'All Specialists Directory',
+                subtitle: 'Search, filter, and consult verified doctors',
+                borderColor: borderColor,
+                textPrimary: textPrimary,
+                textSecondary: textSecondary,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PatientDoctorsScreen(),
                     ),
                   );
                 },

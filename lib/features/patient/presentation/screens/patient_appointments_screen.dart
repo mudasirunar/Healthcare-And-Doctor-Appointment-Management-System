@@ -9,6 +9,7 @@ import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
+import 'patient_doctors_screen.dart';
 
 class PatientAppointmentsScreen extends ConsumerWidget {
   final ScrollController? scrollController;
@@ -238,7 +239,16 @@ class _AppointmentsList extends ConsumerWidget {
         title: emptyTitle,
         description: emptyDescription,
         actionLabel: isUpcoming ? 'Find a Specialist' : null,
-        onAction: isUpcoming ? () => context.go('/patient/home') : null,
+        onAction: isUpcoming
+            ? () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const PatientDoctorsScreen(),
+                  ),
+                );
+              }
+            : null,
       );
     }
 
