@@ -44,6 +44,10 @@ class UserModel {
   final String? emergencyContact;
   final String? medicalAllergies;
 
+  // Real-time presence
+  final bool isOnline;
+  final String? lastSeenUtc;
+
   const UserModel({
     required this.id,
     required this.email,
@@ -58,6 +62,8 @@ class UserModel {
     this.bloodGroup,
     this.emergencyContact,
     this.medicalAllergies,
+    this.isOnline = false,
+    this.lastSeenUtc,
   });
 
   bool get isDoctor => role == UserRole.doctor;
@@ -78,6 +84,8 @@ class UserModel {
     String? bloodGroup,
     String? emergencyContact,
     String? medicalAllergies,
+    bool? isOnline,
+    String? lastSeenUtc,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -93,6 +101,8 @@ class UserModel {
       bloodGroup: bloodGroup ?? this.bloodGroup,
       emergencyContact: emergencyContact ?? this.emergencyContact,
       medicalAllergies: medicalAllergies ?? this.medicalAllergies,
+      isOnline: isOnline ?? this.isOnline,
+      lastSeenUtc: lastSeenUtc ?? this.lastSeenUtc,
     );
   }
 
@@ -111,6 +121,8 @@ class UserModel {
       'bloodGroup': bloodGroup,
       'emergencyContact': emergencyContact,
       'medicalAllergies': medicalAllergies,
+      'isOnline': isOnline,
+      'lastSeenUtc': lastSeenUtc,
     };
   }
 
@@ -129,6 +141,8 @@ class UserModel {
       bloodGroup: map['bloodGroup'] as String?,
       emergencyContact: map['emergencyContact'] as String?,
       medicalAllergies: map['medicalAllergies'] as String?,
+      isOnline: map['isOnline'] as bool? ?? false,
+      lastSeenUtc: map['lastSeenUtc'] as String?,
     );
   }
 }

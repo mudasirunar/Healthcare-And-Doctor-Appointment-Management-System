@@ -6,6 +6,7 @@ import 'package:healthcare_app/core/theme/app_colors.dart';
 import 'package:healthcare_app/core/utils/date_time_utils.dart';
 import 'package:healthcare_app/core/widgets/app_snack_bar.dart';
 import 'package:healthcare_app/core/widgets/state_views.dart';
+import 'package:healthcare_app/features/appointment/domain/entities/appointment_model.dart';
 
 class AppointmentChatScreen extends ConsumerStatefulWidget {
   final String appointmentId;
@@ -41,6 +42,39 @@ class _AppointmentChatScreenState extends ConsumerState<AppointmentChatScreen> {
     });
   }
 
+  String _resolveEffectiveChatId() {
+    final appointments = ref.read(userAppointmentsProvider).valueOrNull ?? [];
+    final currentApt =
+        appointments.where((a) => a.id == widget.appointmentId).firstOrNull;
+    if (currentApt == null) return widget.appointmentId;
+
+    final pairAppointments = appointments
+        .where((a) =>
+            a.patientId == currentApt.patientId &&
+            a.doctorId == currentApt.doctorId &&
+            a.status != AppointmentStatus.cancelled &&
+            a.status != AppointmentStatus.rejected)
+        .toList();
+    if (pairAppointments.isEmpty) return currentApt.id;
+
+    pairAppointments.sort((a, b) {
+      final aHasMsg = a.lastMessageSentAtUtc != null &&
+          a.lastMessageContent != null &&
+          a.lastMessageContent!.trim().isNotEmpty;
+      final bHasMsg = b.lastMessageSentAtUtc != null &&
+          b.lastMessageContent != null &&
+          b.lastMessageContent!.trim().isNotEmpty;
+      if (aHasMsg && !bHasMsg) return -1;
+      if (!aHasMsg && bHasMsg) return 1;
+
+      final timeA = a.lastMessageSentAtUtc ?? a.createdAt;
+      final timeB = b.lastMessageSentAtUtc ?? b.createdAt;
+      return timeB.compareTo(timeA);
+    });
+
+    return pairAppointments.first.id;
+  }
+
   Future<void> _handleSendMessage() async {
     final text = _messageController.text.trim();
     if (text.isEmpty || _isSending) return;
@@ -52,9 +86,10 @@ class _AppointmentChatScreenState extends ConsumerState<AppointmentChatScreen> {
     _messageController.clear();
 
     try {
+      final effectiveChatId = _resolveEffectiveChatId();
       final aptRepo = ref.read(appointmentRepositoryProvider);
       await aptRepo.sendMessage(
-        appointmentId: widget.appointmentId,
+        appointmentId: effectiveChatId,
         senderId: user.id,
         senderName: user.displayName,
         senderRole: user.role.name,
@@ -74,104 +109,163 @@ class _AppointmentChatScreenState extends ConsumerState<AppointmentChatScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final u = ref.read(currentUserProvider);
+      if (u != null) {
+        final effectiveChatId = _resolveEffectiveChatId();
+        ref.read(appointmentRepositoryProvider).markAppointmentMessagesAsRead(
+              appointmentId: effectiveChatId,
+              readerRole: u.role.name,
+            );
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
+    final appointments = ref.watch(userAppointmentsProvider).valueOrNull ?? [];
+    final currentApt =
+        appointments.where((a) => a.id == widget.appointmentId).firstOrNull;
+
+    // Resolve canonical appointment between this pair (1 single conversation per doctor/patient)
+    final AppointmentModel? canonicalApt;
+    if (currentApt != null) {
+      final pairAppointments = appointments
+          .where((a) =>
+              a.patientId == currentApt.patientId &&
+              a.doctorId == currentApt.doctorId &&
+              a.status != AppointmentStatus.cancelled &&
+              a.status != AppointmentStatus.rejected)
+          .toList();
+      if (pairAppointments.isNotEmpty) {
+        pairAppointments.sort((a, b) {
+          final aHasMsg = a.lastMessageSentAtUtc != null &&
+              a.lastMessageContent != null &&
+              a.lastMessageContent!.trim().isNotEmpty;
+          final bHasMsg = b.lastMessageSentAtUtc != null &&
+              b.lastMessageContent != null &&
+              b.lastMessageContent!.trim().isNotEmpty;
+          if (aHasMsg && !bHasMsg) return -1;
+          if (!aHasMsg && bHasMsg) return 1;
+
+          final timeA = a.lastMessageSentAtUtc ?? a.createdAt;
+          final timeB = b.lastMessageSentAtUtc ?? b.createdAt;
+          return timeB.compareTo(timeA);
+        });
+        canonicalApt = pairAppointments.first;
+      } else {
+        canonicalApt = currentApt;
+      }
+    } else {
+      canonicalApt = null;
+    }
+
+    final effectiveChatId = canonicalApt?.id ?? widget.appointmentId;
+    final apt = canonicalApt ?? currentApt;
+
     final messagesAsync =
-        ref.watch(appointmentMessagesStreamProvider(widget.appointmentId));
-    final surfaceColor = AppColors.surfaceOf(context);
-    final borderColor = AppColors.borderOf(context);
+        ref.watch(appointmentMessagesStreamProvider(effectiveChatId));
+
+    // Listen and mark messages read whenever new messages arrive
+    ref.listen(appointmentMessagesStreamProvider(effectiveChatId),
+        (prev, next) {
+      if (user != null) {
+        ref.read(appointmentRepositoryProvider).markAppointmentMessagesAsRead(
+              appointmentId: effectiveChatId,
+              readerRole: user.role.name,
+            );
+      }
+    });
+    final isPatient = user?.isPatient ?? true;
+    final participantName = isPatient
+        ? (apt?.doctorName.isNotEmpty == true ? apt!.doctorName : 'Specialist')
+        : (apt?.patientName.isNotEmpty == true ? apt!.patientName : 'Patient');
+    final targetUserId = isPatient ? (apt?.doctorId ?? '') : (apt?.patientId ?? '');
+    final isOnline = ref.watch(userPresenceStreamProvider(targetUserId)).valueOrNull ?? false;
+
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
+    final surfaceColor = AppColors.surfaceOf(context);
+    final borderColor = AppColors.borderOf(context);
     final isDark = AppColors.isDark(context);
 
     return Scaffold(
       backgroundColor: AppColors.backgroundOf(context),
-      appBar: PreferredSize(
-        preferredSize: const Size.fromHeight(64),
-        child: Container(
-          decoration: BoxDecoration(
-            color: surfaceColor,
-            border: Border(bottom: BorderSide(color: borderColor, width: 1)),
-          ),
-          child: SafeArea(
-            bottom: false,
-            child: Row(
+      appBar: AppBar(
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleSpacing: 0,
+        title: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                IconButton(
-                  icon: Icon(Icons.arrow_back_rounded, color: textPrimary),
-                  onPressed: () => Navigator.pop(context),
+                Flexible(
+                  child: Text(
+                    participantName,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                const SizedBox(width: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: (isOnline ? AppColors.success : const Color(0xFF9E9E9E))
+                        .withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              'Consultation Chat',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: textPrimary,
-                                letterSpacing: -0.2,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.success.withOpacity(0.12),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.circle,
-                                    size: 6, color: AppColors.success),
-                                SizedBox(width: 4),
-                                Text(
-                                  'Online',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppColors.success,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                      Icon(
+                        Icons.circle,
+                        size: 6,
+                        color: isOnline ? AppColors.success : const Color(0xFF9E9E9E),
                       ),
-                      const SizedBox(height: 1),
+                      const SizedBox(width: 4),
                       Text(
-                        'Encrypted • #${widget.appointmentId.length > 8 ? widget.appointmentId.substring(0, 8).toUpperCase() : widget.appointmentId.toUpperCase()}',
+                        isOnline ? 'Online' : 'Offline',
                         style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w500,
-                          color: textSecondary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: isOnline ? AppColors.success : const Color(0xFF9E9E9E),
                         ),
                       ),
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.videocam_rounded,
-                      color: AppColors.primary),
-                  tooltip: 'Join Video Consultation',
-                  onPressed: () =>
-                      context.push('/consultation/room/${widget.appointmentId}'),
-                ),
-                const SizedBox(width: 4),
               ],
             ),
-          ),
+            const SizedBox(height: 1),
+            Text(
+              'Encrypted • #${widget.appointmentId.length > 8 ? widget.appointmentId.substring(0, 8).toUpperCase() : widget.appointmentId.toUpperCase()}',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: textSecondary,
+              ),
+            ),
+          ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.videocam_rounded, color: AppColors.primary),
+            tooltip: 'Join Video Consultation',
+            onPressed: () =>
+                context.push('/consultation/room/${widget.appointmentId}'),
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: Column(
         children: [
@@ -280,8 +374,24 @@ class _AppointmentChatScreenState extends ConsumerState<AppointmentChatScreen> {
                                 ),
                                 if (isMe) ...[
                                   const SizedBox(width: 4),
-                                  const Icon(Icons.done_all_rounded,
-                                      size: 13, color: Colors.white70),
+                                  if (msg.isRead)
+                                    const Icon(
+                                      Icons.done_all_rounded,
+                                      size: 14,
+                                      color: Color(0xFF34B7F1),
+                                    )
+                                  else if (msg.isDelivered || isOnline)
+                                    const Icon(
+                                      Icons.done_all_rounded,
+                                      size: 14,
+                                      color: Colors.white70,
+                                    )
+                                  else
+                                    const Icon(
+                                      Icons.done_rounded,
+                                      size: 14,
+                                      color: Colors.white60,
+                                    ),
                                 ],
                               ],
                             ),

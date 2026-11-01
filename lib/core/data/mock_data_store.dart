@@ -9,6 +9,7 @@ import '../../features/appointment/domain/entities/appointment_model.dart';
 import '../../features/appointment/domain/entities/appointment_state_machine.dart';
 import '../../features/consultation/domain/entities/prescription_model.dart';
 import '../../features/consultation/domain/entities/chat_message_model.dart';
+import '../services/presence_service.dart';
 
 /// Central reactive data store implementing offline-resilient operations,
 /// seed dataset, and atomic slot-booking locks (Challenge #1 & #6).
@@ -661,6 +662,15 @@ class MockDataStore {
     required String senderRole,
     required String content,
   }) async {
+    final nowIso = DateTime.now().toUtc().toIso8601String();
+    final apt = _appointments[appointmentId];
+    final isDoctor = senderRole.toLowerCase() == 'doctor';
+
+    // Check if recipient is online
+    final recipientUserId = isDoctor ? apt?.patientId : apt?.doctorId;
+    final isRecipientOnline = recipientUserId != null &&
+        PresenceService.instance.isUserOnline(recipientUserId);
+
     final msg = ChatMessageModel(
       id: 'msg_${_uuid.v4().substring(0, 8)}',
       appointmentId: appointmentId,
@@ -668,10 +678,55 @@ class MockDataStore {
       senderName: senderName,
       senderRole: senderRole,
       content: content,
-      sentAtUtc: DateTime.now().toUtc().toIso8601String(),
+      sentAtUtc: nowIso,
+      isDelivered: isRecipientOnline,
+      isRead: false,
     );
 
     _appointmentChats.putIfAbsent(appointmentId, () => []).add(msg);
+
+    if (apt != null) {
+      _appointments[appointmentId] = apt.copyWith(
+        lastMessageContent: content,
+        lastMessageSentAtUtc: nowIso,
+        lastMessageSenderId: senderId,
+        unreadCountForPatient: isDoctor
+            ? apt.unreadCountForPatient + 1
+            : apt.unreadCountForPatient,
+        unreadCountForDoctor: !isDoctor
+            ? apt.unreadCountForDoctor + 1
+            : apt.unreadCountForDoctor,
+      );
+      _notifyAppointments();
+    }
+
     return msg;
+  }
+
+  void markAppointmentMessagesAsRead({
+    required String appointmentId,
+    required String readerRole,
+  }) {
+    final isDoctor = readerRole.toLowerCase() == 'doctor';
+    final apt = _appointments[appointmentId];
+    if (apt != null) {
+      _appointments[appointmentId] = apt.copyWith(
+        unreadCountForDoctor: isDoctor ? 0 : apt.unreadCountForDoctor,
+        unreadCountForPatient: !isDoctor ? 0 : apt.unreadCountForPatient,
+      );
+      _notifyAppointments();
+    }
+
+    final messages = _appointmentChats[appointmentId];
+    if (messages != null) {
+      for (int i = 0; i < messages.length; i++) {
+        if (messages[i].senderRole.toLowerCase() != readerRole.toLowerCase()) {
+          messages[i] = messages[i].copyWith(
+            isDelivered: true,
+            isRead: true,
+          );
+        }
+      }
+    }
   }
 }

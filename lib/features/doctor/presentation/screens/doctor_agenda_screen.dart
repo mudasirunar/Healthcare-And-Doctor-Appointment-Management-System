@@ -89,11 +89,19 @@ class DoctorAgendaScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final appointmentsAsync = ref.watch(userAppointmentsProvider);
+    final unreadChats = ref.watch(unreadConversationsCountProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('Consultation Agenda'),
+        actions: [
+          _DoctorChatIconButton(
+            unreadCount: unreadChats,
+            onTap: () => context.push('/doctor/chats'),
+          ),
+          const SizedBox(width: 12),
+        ],
       ),
       body: appointmentsAsync.when(
         data: (appointments) {
@@ -229,6 +237,76 @@ class DoctorAgendaScreen extends ConsumerWidget {
         error: (e, _) => ErrorStateView(
           message: e.toString(),
           onRetry: () => ref.invalidate(userAppointmentsProvider),
+        ),
+      ),
+    );
+  }
+}
+
+class _DoctorChatIconButton extends StatelessWidget {
+  final int unreadCount;
+  final VoidCallback onTap;
+
+  const _DoctorChatIconButton({
+    required this.unreadCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariantOf(context),
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.borderOf(context)),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              unreadCount > 0
+                  ? Icons.chat_bubble_rounded
+                  : Icons.chat_bubble_outline_rounded,
+              size: 20,
+              color: unreadCount > 0 ? AppColors.primary : textPrimary,
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                right: -6,
+                top: -6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(
+                      color: AppColors.surfaceOf(context),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      unreadCount > 9 ? '9+' : '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:healthcare_app/core/services/notification_service.dart';
 import 'package:healthcare_app/core/services/preferences_service.dart';
+import 'package:healthcare_app/core/services/presence_service.dart';
 import 'package:healthcare_app/features/admin/domain/entities/admin_analytics_model.dart';
 import 'package:healthcare_app/features/admin/domain/entities/admin_notification_model.dart';
 import 'package:healthcare_app/features/auth/domain/entities/user_model.dart';
@@ -124,6 +125,54 @@ final appointmentMessagesStreamProvider =
       .snapshots()
       .map((snapshot) =>
           snapshot.docs.map((d) => ChatMessageModel.fromMap(d.data(), id: d.id)).toList());
+});
+
+/// Computes the number of distinct senders/conversations with unread messages.
+final unreadConversationsCountProvider = Provider<int>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return 0;
+  final appointments = ref.watch(userAppointmentsProvider).valueOrNull ?? [];
+  final active = appointments.where((a) =>
+      a.status != AppointmentStatus.cancelled &&
+      a.status != AppointmentStatus.rejected);
+
+  if (user.role == UserRole.patient) {
+    final unreadDoctorIds = <String>{};
+    for (final a in active) {
+      if (a.unreadCountForPatient > 0) {
+        unreadDoctorIds.add(a.doctorId.isNotEmpty ? a.doctorId : a.doctorName);
+      }
+    }
+    return unreadDoctorIds.length;
+  } else if (user.role == UserRole.doctor) {
+    final unreadPatientIds = <String>{};
+    for (final a in active) {
+      if (a.unreadCountForDoctor > 0) {
+        unreadPatientIds.add(a.patientId.isNotEmpty ? a.patientId : a.patientName);
+      }
+    }
+    return unreadPatientIds.length;
+  }
+  return 0;
+});
+
+/// Streams real-time online/offline presence for any user by userId.
+final userPresenceStreamProvider =
+    StreamProvider.family<bool, String>((ref, userId) {
+  if (userId.isEmpty) return Stream.value(false);
+  return FirebaseFirestore.instance
+      .collection('users')
+      .doc(userId)
+      .snapshots()
+      .map((snap) {
+        final online = snap.data()?['isOnline'] as bool? ?? false;
+        PresenceService.instance.updateUserPresenceLocally(userId, online);
+        return online;
+      })
+      .handleError((e) {
+        debugPrint('userPresenceStreamProvider notice: $e');
+        return false;
+      });
 });
 
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {

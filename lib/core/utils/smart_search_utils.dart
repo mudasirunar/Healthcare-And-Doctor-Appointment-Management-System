@@ -71,9 +71,10 @@ class SmartSearchEngine {
       }
     }
 
-    tier1.sort(compareAlphabetically);
-    tier2.sort(compareAlphabetically);
-    tier3.sort(compareAlphabetically);
+    final sortFn = fallbackComparator ?? compareAlphabetically;
+    tier1.sort(sortFn);
+    tier2.sort(sortFn);
+    tier3.sort(sortFn);
 
     return [...tier1, ...tier2, ...tier3];
   }

@@ -85,6 +85,7 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
     final currentIndex = ref.watch(patientSelectedTabProvider);
     final appointmentsAsync = ref.watch(userAppointmentsProvider);
     final unreadNotifs = ref.watch(unreadPatientNotificationsCountProvider);
+    final unreadChats = ref.watch(unreadConversationsCountProvider);
     final upcomingCount = appointmentsAsync.value
             ?.where((a) =>
                 a.status == AppointmentStatus.confirmed ||
@@ -100,6 +101,7 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
         context,
         tabIndex: currentIndex,
         unreadNotificationsCount: unreadNotifs,
+        unreadChatsCount: unreadChats,
       ),
       body: SafeArea(
         bottom: false,
@@ -143,12 +145,18 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
     BuildContext context, {
     required int tabIndex,
     required int unreadNotificationsCount,
+    required int unreadChatsCount,
   }) {
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
     final surfaceColor = AppColors.surfaceOf(context);
     final borderColor = AppColors.borderOf(context);
     final currentUser = ref.watch(currentUserProvider);
+
+    final chatButton = _ChatIconButtonWithBadge(
+      unreadCount: unreadChatsCount,
+      onTap: () => context.push('/patient/chats'),
+    );
 
     final notificationBell = _NotificationBellButton(
       unreadCount: unreadNotificationsCount,
@@ -219,10 +227,7 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
           Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _TopBarIconButton(
-                icon: Icons.chat_outlined,
-                onTap: () => context.push('/patient/chats'),
-              ),
+              chatButton,
               const SizedBox(width: 8),
               notificationBell,
             ],
@@ -328,12 +333,12 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
   }
 }
 
-class _TopBarIconButton extends StatelessWidget {
-  final IconData icon;
+class _ChatIconButtonWithBadge extends StatelessWidget {
+  final int unreadCount;
   final VoidCallback onTap;
 
-  const _TopBarIconButton({
-    required this.icon,
+  const _ChatIconButtonWithBadge({
+    required this.unreadCount,
     required this.onTap,
   });
 
@@ -353,10 +358,45 @@ class _TopBarIconButton extends StatelessWidget {
           shape: BoxShape.circle,
           border: Border.all(color: AppColors.borderOf(context)),
         ),
-        child: Icon(
-          icon,
-          size: 20,
-          color: textPrimary,
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              unreadCount > 0
+                  ? Icons.chat_bubble_rounded
+                  : Icons.chat_bubble_outline_rounded,
+              size: 20,
+              color: unreadCount > 0 ? AppColors.primary : textPrimary,
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                right: -6,
+                top: -6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(
+                      color: AppColors.surfaceOf(context),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      unreadCount > 9 ? '9+' : '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

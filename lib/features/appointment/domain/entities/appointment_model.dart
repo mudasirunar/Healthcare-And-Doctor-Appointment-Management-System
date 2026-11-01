@@ -98,6 +98,11 @@ class AppointmentModel {
   final String videoRoomId;
   final String createdAt;
   final String updatedAt;
+  final String? lastMessageContent;
+  final String? lastMessageSentAtUtc;
+  final String? lastMessageSenderId;
+  final int unreadCountForPatient;
+  final int unreadCountForDoctor;
 
   /// Formats the room identifier into a compact hospital room code (e.g., "AB-12", "BC-04").
   String get displayRoomName {
@@ -145,6 +150,11 @@ class AppointmentModel {
     required this.videoRoomId,
     required this.createdAt,
     required this.updatedAt,
+    this.lastMessageContent,
+    this.lastMessageSentAtUtc,
+    this.lastMessageSenderId,
+    this.unreadCountForPatient = 0,
+    this.unreadCountForDoctor = 0,
   });
 
   AppointmentModel copyWith({
@@ -166,6 +176,11 @@ class AppointmentModel {
     String? videoRoomId,
     String? createdAt,
     String? updatedAt,
+    String? lastMessageContent,
+    String? lastMessageSentAtUtc,
+    String? lastMessageSenderId,
+    int? unreadCountForPatient,
+    int? unreadCountForDoctor,
   }) {
     return AppointmentModel(
       id: id ?? this.id,
@@ -186,6 +201,11 @@ class AppointmentModel {
       videoRoomId: videoRoomId ?? this.videoRoomId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      lastMessageContent: lastMessageContent ?? this.lastMessageContent,
+      lastMessageSentAtUtc: lastMessageSentAtUtc ?? this.lastMessageSentAtUtc,
+      lastMessageSenderId: lastMessageSenderId ?? this.lastMessageSenderId,
+      unreadCountForPatient: unreadCountForPatient ?? this.unreadCountForPatient,
+      unreadCountForDoctor: unreadCountForDoctor ?? this.unreadCountForDoctor,
     );
   }
 
@@ -209,6 +229,11 @@ class AppointmentModel {
       'videoRoomId': videoRoomId,
       'createdAt': createdAt,
       'updatedAt': updatedAt,
+      'lastMessageContent': lastMessageContent,
+      'lastMessageSentAtUtc': lastMessageSentAtUtc,
+      'lastMessageSenderId': lastMessageSenderId,
+      'unreadCountForPatient': unreadCountForPatient,
+      'unreadCountForDoctor': unreadCountForDoctor,
     };
   }
 
@@ -237,6 +262,11 @@ class AppointmentModel {
       videoRoomId: map['videoRoomId'] as String? ?? '',
       createdAt: map['createdAt'] as String? ?? DateTime.now().toUtc().toIso8601String(),
       updatedAt: map['updatedAt'] as String? ?? DateTime.now().toUtc().toIso8601String(),
+      lastMessageContent: map['lastMessageContent'] as String?,
+      lastMessageSentAtUtc: map['lastMessageSentAtUtc'] as String?,
+      lastMessageSenderId: map['lastMessageSenderId'] as String?,
+      unreadCountForPatient: (map['unreadCountForPatient'] as num?)?.toInt() ?? 0,
+      unreadCountForDoctor: (map['unreadCountForDoctor'] as num?)?.toInt() ?? 0,
     );
   }
 }

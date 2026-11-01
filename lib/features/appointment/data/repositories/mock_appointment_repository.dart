@@ -171,4 +171,15 @@ class MockAppointmentRepository implements AppointmentRepository {
       content: content,
     );
   }
+
+  @override
+  Future<void> markAppointmentMessagesAsRead({
+    required String appointmentId,
+    required String readerRole,
+  }) async {
+    _dataStore.markAppointmentMessagesAsRead(
+      appointmentId: appointmentId,
+      readerRole: readerRole,
+    );
+  }
 }

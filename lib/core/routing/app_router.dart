@@ -9,6 +9,7 @@ import '../../features/patient/presentation/screens/patient_appointments_screen.
 import '../../features/patient/presentation/screens/patient_notifications_screen.dart';
 import '../../features/patient/presentation/screens/patient_specialties_screen.dart';
 import '../../features/consultation/presentation/screens/patient_chats_hub_screen.dart';
+import '../../features/consultation/presentation/screens/doctor_chats_hub_screen.dart';
 import '../../features/doctor/presentation/screens/doctor_main_screen.dart';
 import '../../features/doctor/presentation/screens/doctor_availability_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
@@ -86,6 +87,10 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/doctor/availability',
       builder: (context, state) => const DoctorAvailabilityScreen(),
+    ),
+    GoRoute(
+      path: '/doctor/chats',
+      builder: (context, state) => const DoctorChatsHubScreen(),
     ),
     GoRoute(
       path: '/admin',

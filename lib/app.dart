@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/providers/app_providers.dart';
 import 'core/routing/app_router.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/presence_service.dart';
 import 'core/theme/app_theme.dart';
 
 class HealthcareApp extends ConsumerStatefulWidget {
@@ -31,15 +32,17 @@ class _HealthcareAppState extends ConsumerState<HealthcareApp> {
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
 
-    // Automatically manage real-time notification listener as user authenticates/signs out
+    // Automatically manage real-time notification listener and presence as user authenticates/signs out
     ref.listen(currentUserProvider, (previous, next) {
       if (next != null) {
         NotificationService.instance.startListeningForUser(
           next.id,
           isAdmin: next.isAdmin,
         );
+        PresenceService.instance.initialize(next.id);
       } else {
         NotificationService.instance.stopListening();
+        PresenceService.instance.dispose();
       }
     });
 
@@ -50,6 +53,7 @@ class _HealthcareAppState extends ConsumerState<HealthcareApp> {
         currentUser.id,
         isAdmin: currentUser.isAdmin,
       );
+      PresenceService.instance.initialize(currentUser.id);
     }
 
     return MaterialApp.router(

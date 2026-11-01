@@ -6,6 +6,8 @@ class ChatMessageModel {
   final String senderRole; // 'patient' | 'doctor'
   final String content;
   final String sentAtUtc;
+  final bool isDelivered;
+  final bool isRead;
 
   const ChatMessageModel({
     required this.id,
@@ -15,7 +17,33 @@ class ChatMessageModel {
     required this.senderRole,
     required this.content,
     required this.sentAtUtc,
+    this.isDelivered = false,
+    this.isRead = false,
   });
+
+  ChatMessageModel copyWith({
+    String? id,
+    String? appointmentId,
+    String? senderId,
+    String? senderName,
+    String? senderRole,
+    String? content,
+    String? sentAtUtc,
+    bool? isDelivered,
+    bool? isRead,
+  }) {
+    return ChatMessageModel(
+      id: id ?? this.id,
+      appointmentId: appointmentId ?? this.appointmentId,
+      senderId: senderId ?? this.senderId,
+      senderName: senderName ?? this.senderName,
+      senderRole: senderRole ?? this.senderRole,
+      content: content ?? this.content,
+      sentAtUtc: sentAtUtc ?? this.sentAtUtc,
+      isDelivered: isDelivered ?? this.isDelivered,
+      isRead: isRead ?? this.isRead,
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -26,6 +54,8 @@ class ChatMessageModel {
       'senderRole': senderRole,
       'content': content,
       'sentAtUtc': sentAtUtc,
+      'isDelivered': isDelivered,
+      'isRead': isRead,
     };
   }
 
@@ -38,6 +68,8 @@ class ChatMessageModel {
       senderRole: map['senderRole'] as String? ?? 'patient',
       content: map['content'] as String? ?? '',
       sentAtUtc: map['sentAtUtc'] as String? ?? DateTime.now().toUtc().toIso8601String(),
+      isDelivered: map['isDelivered'] as bool? ?? false,
+      isRead: map['isRead'] as bool? ?? false,
     );
   }
 }

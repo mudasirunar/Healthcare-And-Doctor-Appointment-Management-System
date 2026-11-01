@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:healthcare_app/core/errors/app_exceptions.dart';
 import 'package:healthcare_app/core/utils/date_time_utils.dart';
@@ -373,6 +374,60 @@ class FirebaseAppointmentRepository implements AppointmentRepository {
         .doc(messageId)
         .set(message.toMap());
 
+    // Update appointment document preview & increment recipient unread count remotely in Firestore
+    final isSenderDoctor = senderRole.toLowerCase() == 'doctor';
+    await _firestore.collection('appointments').doc(appointmentId).set({
+      'lastMessageContent': content,
+      'lastMessageSentAtUtc': nowIso,
+      'lastMessageSenderId': senderId,
+      if (isSenderDoctor)
+        'unreadCountForPatient': FieldValue.increment(1)
+      else
+        'unreadCountForDoctor': FieldValue.increment(1),
+    }, SetOptions(merge: true));
+
     return message;
+  }
+
+  @override
+  Future<void> markAppointmentMessagesAsRead({
+    required String appointmentId,
+    required String readerRole,
+  }) async {
+    try {
+      final isDoctor = readerRole.toLowerCase() == 'doctor';
+      // Reset unread count remotely in Firestore on appointment doc
+      await _firestore.collection('appointments').doc(appointmentId).set({
+        if (isDoctor)
+          'unreadCountForDoctor': 0
+        else
+          'unreadCountForPatient': 0,
+      }, SetOptions(merge: true));
+
+      // Mark unread messages in Firestore subcollection as read
+      final unreadSnap = await _firestore
+          .collection('appointments')
+          .doc(appointmentId)
+          .collection('messages')
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      if (unreadSnap.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final doc in unreadSnap.docs) {
+          final data = doc.data();
+          final senderRole = data['senderRole'] as String? ?? '';
+          if (senderRole.toLowerCase() != readerRole.toLowerCase()) {
+            batch.update(doc.reference, {
+              'isRead': true,
+              'isDelivered': true,
+            });
+          }
+        }
+        await batch.commit();
+      }
+    } catch (e) {
+      debugPrint('Notice: markAppointmentMessagesAsRead: $e');
+    }
   }
 }
