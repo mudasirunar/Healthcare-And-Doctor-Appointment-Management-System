@@ -38,6 +38,10 @@ final appRouter = GoRouter(
       builder: (context, state) => const SignUpScreen(),
     ),
     GoRoute(
+      path: '/patient',
+      builder: (context, state) => const PatientMainScreen(),
+    ),
+    GoRoute(
       path: '/patient/home',
       builder: (context, state) => const PatientMainScreen(),
     ),
@@ -72,12 +76,20 @@ final appRouter = GoRouter(
       builder: (context, state) => const PatientChatsHubScreen(),
     ),
     GoRoute(
+      path: '/doctor',
+      builder: (context, state) => const DoctorMainScreen(),
+    ),
+    GoRoute(
       path: '/doctor/workspace',
       builder: (context, state) => const DoctorMainScreen(),
     ),
     GoRoute(
       path: '/doctor/availability',
       builder: (context, state) => const DoctorAvailabilityScreen(),
+    ),
+    GoRoute(
+      path: '/admin',
+      builder: (context, state) => const AdminDashboardScreen(),
     ),
     GoRoute(
       path: '/admin/dashboard',

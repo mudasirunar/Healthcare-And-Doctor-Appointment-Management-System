@@ -399,27 +399,20 @@ class _UnifiedNotificationsScreenState
 
       final unreadCount = normalized.where((n) => !n.isRead).length;
 
-      return PopScope(
-        onPopInvokedWithResult: (didPop, _) {
-          if (didPop && widget.role == NotificationRole.admin) {
-            _handleMarkAllRead();
-          }
-        },
-        child: _buildScaffold(
-          context: context,
+      return _buildScaffold(
+        context: context,
+        isDark: isDark,
+        surfaceColor: surfaceColor,
+        borderColor: borderColor,
+        textPrimary: textPrimary,
+        textSecondary: textSecondary,
+        unreadCount: unreadCount,
+        content: _buildNotificationList(
+          items: normalized,
           isDark: isDark,
-          surfaceColor: surfaceColor,
           borderColor: borderColor,
           textPrimary: textPrimary,
           textSecondary: textSecondary,
-          unreadCount: unreadCount,
-          content: _buildNotificationList(
-            items: normalized,
-            isDark: isDark,
-            borderColor: borderColor,
-            textPrimary: textPrimary,
-            textSecondary: textSecondary,
-          ),
         ),
       );
     }
