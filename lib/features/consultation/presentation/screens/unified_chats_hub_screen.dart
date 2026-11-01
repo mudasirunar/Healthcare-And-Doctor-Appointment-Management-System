@@ -19,6 +19,7 @@ enum _ChatFilterTab { all, unread }
 
 /// WhatsApp-style message delivery and read status
 enum MessageTickStatus {
+  sending, // WhatsApp clock icon (sending / offline queue)
   sent, // Single gray tick (sent to server, recipient offline)
   delivered, // Double gray tick (reached recipient's device / recipient is online)
   read, // Double blue tick (opened and seen by recipient)
@@ -38,6 +39,12 @@ class _MessageStatusTick extends StatelessWidget {
         AppColors.textSecondaryOf(context).withValues(alpha: 0.85);
 
     switch (status) {
+      case MessageTickStatus.sending:
+        return Icon(
+          Icons.access_time_rounded,
+          size: 13.5,
+          color: grayColor,
+        );
       case MessageTickStatus.sent:
         return Icon(
           Icons.done_rounded,
@@ -196,12 +203,12 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
           // Group by participant (1 single conversation per doctor or patient)
           final Map<String, List<AppointmentModel>> grouped = {};
           for (final apt in activeConversations) {
-            final doctorKey = apt.doctorId.trim().isNotEmpty
-                ? apt.doctorId.trim()
-                : apt.doctorName.trim();
-            final patientKey = apt.patientId.trim().isNotEmpty
-                ? apt.patientId.trim()
-                : apt.patientName.trim();
+            final doctorKey = apt.doctorName.trim().isNotEmpty
+                ? apt.doctorName.trim().toLowerCase()
+                : apt.doctorId.trim().toLowerCase();
+            final patientKey = apt.patientName.trim().isNotEmpty
+                ? apt.patientName.trim().toLowerCase()
+                : apt.patientId.trim().toLowerCase();
             final key = isPatient ? doctorKey : patientKey;
             grouped.putIfAbsent(key, () => []).add(apt);
           }
@@ -263,12 +270,12 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
             primaryTextBuilder: (a) =>
                 isPatient ? a.doctorName : a.patientName,
             secondaryTextsBuilder: (a) {
-              final doctorKey = a.doctorId.trim().isNotEmpty
-                  ? a.doctorId.trim()
-                  : a.doctorName.trim();
-              final patientKey = a.patientId.trim().isNotEmpty
-                  ? a.patientId.trim()
-                  : a.patientName.trim();
+              final doctorKey = a.doctorName.trim().isNotEmpty
+                  ? a.doctorName.trim().toLowerCase()
+                  : a.doctorId.trim().toLowerCase();
+              final patientKey = a.patientName.trim().isNotEmpty
+                  ? a.patientName.trim().toLowerCase()
+                  : a.patientId.trim().toLowerCase();
               final pKey = isPatient ? doctorKey : patientKey;
               final history = _chatHistoryCache[pKey] ?? [];
 

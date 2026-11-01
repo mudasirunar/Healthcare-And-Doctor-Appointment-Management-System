@@ -162,6 +162,7 @@ class MockAppointmentRepository implements AppointmentRepository {
     required String senderName,
     required String senderRole,
     required String content,
+    String? messageId,
   }) async {
     return _dataStore.sendMessage(
       appointmentId: appointmentId,
@@ -169,6 +170,7 @@ class MockAppointmentRepository implements AppointmentRepository {
       senderName: senderName,
       senderRole: senderRole,
       content: content,
+      messageId: messageId,
     );
   }
 

@@ -8,6 +8,7 @@ class ChatMessageModel {
   final String sentAtUtc;
   final bool isDelivered;
   final bool isRead;
+  final bool isPending;
 
   const ChatMessageModel({
     required this.id,
@@ -19,6 +20,7 @@ class ChatMessageModel {
     required this.sentAtUtc,
     this.isDelivered = false,
     this.isRead = false,
+    this.isPending = false,
   });
 
   ChatMessageModel copyWith({
@@ -31,6 +33,7 @@ class ChatMessageModel {
     String? sentAtUtc,
     bool? isDelivered,
     bool? isRead,
+    bool? isPending,
   }) {
     return ChatMessageModel(
       id: id ?? this.id,
@@ -42,6 +45,7 @@ class ChatMessageModel {
       sentAtUtc: sentAtUtc ?? this.sentAtUtc,
       isDelivered: isDelivered ?? this.isDelivered,
       isRead: isRead ?? this.isRead,
+      isPending: isPending ?? this.isPending,
     );
   }
 
@@ -59,7 +63,8 @@ class ChatMessageModel {
     };
   }
 
-  factory ChatMessageModel.fromMap(Map<String, dynamic> map, {String? id}) {
+  factory ChatMessageModel.fromMap(Map<String, dynamic> map,
+      {String? id, bool isPending = false}) {
     return ChatMessageModel(
       id: id ?? map['id'] as String? ?? '',
       appointmentId: map['appointmentId'] as String? ?? '',
@@ -67,9 +72,11 @@ class ChatMessageModel {
       senderName: map['senderName'] as String? ?? '',
       senderRole: map['senderRole'] as String? ?? 'patient',
       content: map['content'] as String? ?? '',
-      sentAtUtc: map['sentAtUtc'] as String? ?? DateTime.now().toUtc().toIso8601String(),
+      sentAtUtc:
+          map['sentAtUtc'] as String? ?? DateTime.now().toUtc().toIso8601String(),
       isDelivered: map['isDelivered'] as bool? ?? false,
       isRead: map['isRead'] as bool? ?? false,
+      isPending: isPending,
     );
   }
 }

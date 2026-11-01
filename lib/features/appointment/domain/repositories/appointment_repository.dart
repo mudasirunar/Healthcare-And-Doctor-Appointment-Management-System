@@ -55,6 +55,7 @@ abstract class AppointmentRepository {
     required String senderName,
     required String senderRole,
     required String content,
+    String? messageId,
   });
   Future<void> markAppointmentMessagesAsRead({
     required String appointmentId,

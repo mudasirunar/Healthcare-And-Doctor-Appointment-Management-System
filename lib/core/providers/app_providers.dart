@@ -122,9 +122,11 @@ final appointmentMessagesStreamProvider =
       .doc(appointmentId)
       .collection('messages')
       .orderBy('sentAtUtc', descending: false)
-      .snapshots()
-      .map((snapshot) =>
-          snapshot.docs.map((d) => ChatMessageModel.fromMap(d.data(), id: d.id)).toList());
+      .snapshots(includeMetadataChanges: true)
+      .map((snapshot) => snapshot.docs
+          .map((d) => ChatMessageModel.fromMap(d.data(),
+              id: d.id, isPending: d.metadata.hasPendingWrites))
+          .toList());
 });
 
 /// Computes the number of distinct senders/conversations with unread messages.

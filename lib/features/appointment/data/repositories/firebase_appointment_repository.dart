@@ -353,12 +353,14 @@ class FirebaseAppointmentRepository implements AppointmentRepository {
     required String senderName,
     required String senderRole,
     required String content,
+    String? messageId,
   }) async {
-    final messageId = 'msg_${_uuid.v4().substring(0, 8)}';
+    final effectiveMessageId =
+        messageId ?? 'msg_${_uuid.v4().substring(0, 8)}';
     final nowIso = DateTime.now().toUtc().toIso8601String();
 
     final message = ChatMessageModel(
-      id: messageId,
+      id: effectiveMessageId,
       appointmentId: appointmentId,
       senderId: senderId,
       senderName: senderName,
@@ -371,7 +373,7 @@ class FirebaseAppointmentRepository implements AppointmentRepository {
         .collection('appointments')
         .doc(appointmentId)
         .collection('messages')
-        .doc(messageId)
+        .doc(effectiveMessageId)
         .set(message.toMap());
 
     // Update appointment document preview & increment recipient unread count remotely in Firestore

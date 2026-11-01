@@ -661,6 +661,7 @@ class MockDataStore {
     required String senderName,
     required String senderRole,
     required String content,
+    String? messageId,
   }) async {
     final nowIso = DateTime.now().toUtc().toIso8601String();
     final apt = _appointments[appointmentId];
@@ -671,8 +672,11 @@ class MockDataStore {
     final isRecipientOnline = recipientUserId != null &&
         PresenceService.instance.isUserOnline(recipientUserId);
 
+    final effectiveMessageId =
+        messageId ?? 'msg_${_uuid.v4().substring(0, 8)}';
+
     final msg = ChatMessageModel(
-      id: 'msg_${_uuid.v4().substring(0, 8)}',
+      id: effectiveMessageId,
       appointmentId: appointmentId,
       senderId: senderId,
       senderName: senderName,
