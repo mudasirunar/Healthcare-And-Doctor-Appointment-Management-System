@@ -258,42 +258,44 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
     return PreferredSize(
       preferredSize: const Size.fromHeight(72),
-      child: Container(
-        decoration: BoxDecoration(
-          color: surfaceColor,
-          border: Border(bottom: BorderSide(color: borderColor, width: 1)),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        title,
-                        style: AppTypography.headline.copyWith(
-                          fontSize: 19,
-                          color: textPrimary,
+      child: RepaintBoundary(
+        child: Container(
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          title,
+                          style: AppTypography.headline.copyWith(
+                            fontSize: 19,
+                            color: textPrimary,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: AppTypography.caption.copyWith(
-                          color: textSecondary,
-                          fontWeight: FontWeight.w500,
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          style: AppTypography.caption.copyWith(
+                            color: textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                ?trailing,
-              ],
+                  ?trailing,
+                ],
+              ),
             ),
           ),
         ),

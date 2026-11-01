@@ -193,19 +193,20 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
                   children: [
                     Text(
                       'Patient Dashboard',
-                      style: TextStyle(
-                        fontSize: 11.5,
+                      style: AppTypography.caption.copyWith(
+                        fontSize: 12,
                         fontWeight: FontWeight.w500,
                         color: textSecondary,
                       ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       currentUser?.displayName ?? 'Patient',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
+                      style: AppTypography.headline.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
                         color: textPrimary,
-                        letterSpacing: -0.3,
+                        letterSpacing: 0,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -303,20 +304,22 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
 
     return PreferredSize(
       preferredSize: const Size.fromHeight(68),
-      child: Container(
-        decoration: BoxDecoration(
-          color: surfaceColor,
-          border: Border(bottom: BorderSide(color: borderColor, width: 1)),
-        ),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              children: [
-                Expanded(child: leadingContent),
-                ?trailingContent,
-              ],
+      child: RepaintBoundary(
+        child: Container(
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(child: leadingContent),
+                  ?trailingContent,
+                ],
+              ),
             ),
           ),
         ),
