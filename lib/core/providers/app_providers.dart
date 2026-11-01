@@ -8,6 +8,7 @@ import 'package:healthcare_app/features/admin/domain/entities/admin_notification
 import 'package:healthcare_app/features/auth/domain/entities/user_model.dart';
 import 'package:healthcare_app/features/auth/domain/repositories/auth_repository.dart';
 import 'package:healthcare_app/features/auth/data/repositories/firebase_auth_repository.dart';
+import 'package:healthcare_app/features/consultation/domain/entities/chat_message_model.dart';
 import 'package:healthcare_app/features/consultation/domain/entities/prescription_model.dart';
 import 'package:healthcare_app/features/doctor/domain/entities/doctor_model.dart';
 import 'package:healthcare_app/features/doctor/domain/entities/specialty_model.dart';
@@ -17,7 +18,77 @@ import 'package:healthcare_app/features/appointment/domain/entities/appointment_
 import 'package:healthcare_app/features/appointment/domain/repositories/appointment_repository.dart';
 import 'package:healthcare_app/features/appointment/data/repositories/firebase_appointment_repository.dart';
 
-// --- THEME PREFERENCE STATE ---
+// --- PATIENT NOTIFICATIONS & LIVE CONSULTATION STREAMS ---
+class PatientNotificationItem {
+  final String id;
+  final String userId;
+  final String title;
+  final String body;
+  final String type;
+  final String createdAt;
+  final bool isRead;
+
+  const PatientNotificationItem({
+    required this.id,
+    required this.userId,
+    required this.title,
+    required this.body,
+    required this.type,
+    required this.createdAt,
+    required this.isRead,
+  });
+
+  factory PatientNotificationItem.fromMap(Map<String, dynamic> map, {required String id}) {
+    return PatientNotificationItem(
+      id: id,
+      userId: map['userId'] as String? ?? '',
+      title: map['title'] as String? ?? 'Notification',
+      body: map['body'] as String? ?? '',
+      type: map['type'] as String? ?? 'general',
+      createdAt: map['createdAt'] as String? ?? DateTime.now().toUtc().toIso8601String(),
+      isRead: map['isRead'] as bool? ?? false,
+    );
+  }
+}
+
+final patientNotificationsStreamProvider = StreamProvider<List<PatientNotificationItem>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return const Stream.empty();
+
+  try {
+    return FirebaseFirestore.instance
+        .collection('notifications')
+        .where('userId', isEqualTo: user.id)
+        .snapshots()
+        .map((snapshot) {
+      final list = snapshot.docs
+          .map((doc) => PatientNotificationItem.fromMap(doc.data(), id: doc.id))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    }).handleError((_) => <PatientNotificationItem>[]);
+  } catch (_) {
+    return Stream.value(<PatientNotificationItem>[]);
+  }
+});
+
+final unreadPatientNotificationsCountProvider = Provider<int>((ref) {
+  final asyncVal = ref.watch(patientNotificationsStreamProvider);
+  return asyncVal.valueOrNull?.where((n) => !n.isRead).length ?? 0;
+});
+
+final appointmentMessagesStreamProvider =
+    StreamProvider.family<List<ChatMessageModel>, String>((ref, appointmentId) {
+  return FirebaseFirestore.instance
+      .collection('appointments')
+      .doc(appointmentId)
+      .collection('messages')
+      .orderBy('sentAtUtc', descending: false)
+      .snapshots()
+      .map((snapshot) =>
+          snapshot.docs.map((d) => ChatMessageModel.fromMap(d.data(), id: d.id)).toList());
+});
+
 class ThemeModeNotifier extends StateNotifier<ThemeMode> {
   ThemeModeNotifier() : super(PreferencesService.instance.getThemeMode());
 
@@ -147,6 +218,14 @@ final userAppointmentsProvider = FutureProvider<List<AppointmentModel>>((ref) as
   } else {
     return repo.getAllAppointments();
   }
+});
+
+final verifiedDoctorsStreamProvider = StreamProvider<List<DoctorModel>>((ref) {
+  return FirebaseFirestore.instance
+      .collection('doctors')
+      .where('verificationStatus', isEqualTo: 'approved')
+      .snapshots()
+      .map((s) => s.docs.map((d) => DoctorModel.fromMap(d.data(), id: d.id)).toList());
 });
 
 // --- ADMIN LIVE DIRECTORY, APPOINTMENTS, PRESCRIPTIONS & NOTIFICATIONS ---

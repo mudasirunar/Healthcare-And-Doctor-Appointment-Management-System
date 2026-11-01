@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:healthcare_app/core/providers/app_providers.dart';
 import 'package:healthcare_app/core/theme/app_colors.dart';
-import 'package:healthcare_app/core/theme/app_typography.dart';
 import 'package:healthcare_app/core/utils/date_time_utils.dart';
+import 'package:healthcare_app/core/widgets/app_snack_bar.dart';
 import 'package:healthcare_app/core/widgets/state_views.dart';
-import 'package:healthcare_app/features/consultation/domain/entities/chat_message_model.dart';
 
 class AppointmentChatScreen extends ConsumerStatefulWidget {
   final String appointmentId;
@@ -13,38 +13,20 @@ class AppointmentChatScreen extends ConsumerStatefulWidget {
   const AppointmentChatScreen({super.key, required this.appointmentId});
 
   @override
-  ConsumerState<AppointmentChatScreen> createState() => _AppointmentChatScreenState();
+  ConsumerState<AppointmentChatScreen> createState() =>
+      _AppointmentChatScreenState();
 }
 
 class _AppointmentChatScreenState extends ConsumerState<AppointmentChatScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
-  List<ChatMessageModel> _messages = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadMessages();
-  }
+  bool _isSending = false;
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
-  }
-
-  Future<void> _loadMessages() async {
-    final aptRepo = ref.read(appointmentRepositoryProvider);
-    final msgs = await aptRepo.getMessages(widget.appointmentId);
-    if (mounted) {
-      setState(() {
-        _messages = msgs;
-        _isLoading = false;
-      });
-      _scrollToBottom();
-    }
   }
 
   void _scrollToBottom() {
@@ -61,128 +43,264 @@ class _AppointmentChatScreenState extends ConsumerState<AppointmentChatScreen> {
 
   Future<void> _handleSendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isSending) return;
 
     final user = ref.read(currentUserProvider);
     if (user == null) return;
 
+    setState(() => _isSending = true);
     _messageController.clear();
-    final aptRepo = ref.read(appointmentRepositoryProvider);
 
-    final sentMsg = await aptRepo.sendMessage(
-      appointmentId: widget.appointmentId,
-      senderId: user.id,
-      senderName: user.displayName,
-      senderRole: user.role.name,
-      content: text,
-    );
+    try {
+      final aptRepo = ref.read(appointmentRepositoryProvider);
+      await aptRepo.sendMessage(
+        appointmentId: widget.appointmentId,
+        senderId: user.id,
+        senderName: user.displayName,
+        senderRole: user.role.name,
+        content: text,
+      );
 
-    setState(() {
-      _messages.add(sentMsg);
-    });
-    _scrollToBottom();
+      _scrollToBottom();
+    } catch (e) {
+      if (mounted) {
+        AppSnackBar.showError(context, 'Failed to send: ${e.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSending = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
+    final messagesAsync =
+        ref.watch(appointmentMessagesStreamProvider(widget.appointmentId));
+    final surfaceColor = AppColors.surfaceOf(context);
+    final borderColor = AppColors.borderOf(context);
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textSecondary = AppColors.textSecondaryOf(context);
+    final isDark = AppColors.isDark(context);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Consultation Chat', style: TextStyle(fontSize: 16)),
-            Text(
-              'Encrypted • Scoped to #${widget.appointmentId}',
-              style: AppTypography.caption.copyWith(color: AppColors.textMuted),
+      backgroundColor: AppColors.backgroundOf(context),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(64),
+        child: Container(
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Row(
+              children: [
+                IconButton(
+                  icon: Icon(Icons.arrow_back_rounded, color: textPrimary),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              'Consultation Chat',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: textPrimary,
+                                letterSpacing: -0.2,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withOpacity(0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.circle,
+                                    size: 6, color: AppColors.success),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Online',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.success,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'Encrypted • #${widget.appointmentId.length > 8 ? widget.appointmentId.substring(0, 8).toUpperCase() : widget.appointmentId.toUpperCase()}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.videocam_rounded,
+                      color: AppColors.primary),
+                  tooltip: 'Join Video Consultation',
+                  onPressed: () =>
+                      context.push('/consultation/room/${widget.appointmentId}'),
+                ),
+                const SizedBox(width: 4),
+              ],
             ),
-          ],
+          ),
         ),
       ),
       body: Column(
         children: [
+          // Streamed Real-time Message List
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _messages.isEmpty
-                    ? const EmptyStateView(
-                        icon: Icons.chat_bubble_outline_rounded,
-                        title: 'No Messages Yet',
-                        description: 'Send a message to your healthcare provider or patient regarding this appointment.',
-                      )
-                    : ListView.separated(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _messages.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final msg = _messages[index];
-                          final isMe = user?.id == msg.senderId;
+            child: messagesAsync.when(
+              loading: () => const Center(
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+              error: (err, _) => ErrorStateView(
+                message: err.toString(),
+                onRetry: () => ref.refresh(
+                    appointmentMessagesStreamProvider(widget.appointmentId)),
+              ),
+              data: (messages) {
+                if (messages.isEmpty) {
+                  return const EmptyStateView(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    title: 'No Messages Yet',
+                    description:
+                        'Send a message to your doctor regarding symptoms, questions, or visit details.',
+                  );
+                }
 
-                          return Align(
-                            alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-                            child: Container(
-                              constraints: BoxConstraints(
-                                maxWidth: MediaQuery.of(context).size.width * 0.75,
-                              ),
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: isMe ? AppColors.primary : AppColors.surface,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(14),
-                                  topRight: const Radius.circular(14),
-                                  bottomLeft: isMe ? const Radius.circular(14) : Radius.zero,
-                                  bottomRight: isMe ? Radius.zero : const Radius.circular(14),
-                                ),
-                                border: isMe ? null : Border.all(color: AppColors.border),
-                                boxShadow: const [
-                                  BoxShadow(
-                                    color: Color(0x05000000),
-                                    blurRadius: 4,
-                                    offset: Offset(0, 1),
-                                  ),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    msg.senderName,
-                                    style: AppTypography.caption.copyWith(
-                                      color: isMe ? Colors.white70 : AppColors.primary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 10,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    msg.content,
-                                    style: AppTypography.bodyMedium.copyWith(
-                                      color: isMe ? Colors.white : AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    DateTimeUtils.formatLocalTime(msg.sentAtUtc),
-                                    style: AppTypography.caption.copyWith(
-                                      color: isMe ? Colors.white60 : AppColors.textMuted,
-                                      fontSize: 9,
-                                    ),
-                                  ),
-                                ],
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (_scrollController.hasClients) {
+                    _scrollController.jumpTo(
+                        _scrollController.position.maxScrollExtent);
+                  }
+                });
+
+                return ListView.separated(
+                  controller: _scrollController,
+                  physics: const BouncingScrollPhysics(),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  itemCount: messages.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final msg = messages[index];
+                    final isMe = user?.id == msg.senderId;
+
+                    return Align(
+                      alignment:
+                          isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        constraints: BoxConstraints(
+                          maxWidth: MediaQuery.of(context).size.width * 0.78,
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isMe
+                              ? AppColors.primary
+                              : (isDark ? surfaceColor : const Color(0xFFF1F5F9)),
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(12),
+                            topRight: const Radius.circular(12),
+                            bottomLeft: isMe
+                                ? const Radius.circular(12)
+                                : Radius.zero,
+                            bottomRight: isMe
+                                ? Radius.zero
+                                : const Radius.circular(12),
+                          ),
+                          border: isMe
+                              ? null
+                              : Border.all(color: borderColor),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: isMe
+                              ? CrossAxisAlignment.end
+                              : CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              msg.senderName,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w700,
+                                color: isMe
+                                    ? Colors.white70
+                                    : AppColors.primary,
                               ),
                             ),
-                          );
-                        },
+                            const SizedBox(height: 4),
+                            Text(
+                              msg.content,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                height: 1.35,
+                                color: isMe ? Colors.white : textPrimary,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  DateTimeUtils.formatLocalTime(msg.sentAtUtc),
+                                  style: TextStyle(
+                                    fontSize: 9.5,
+                                    color: isMe
+                                        ? Colors.white60
+                                        : textSecondary.withOpacity(0.8),
+                                  ),
+                                ),
+                                if (isMe) ...[
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.done_all_rounded,
+                                      size: 13, color: Colors.white70),
+                                ],
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
+                    );
+                  },
+                );
+              },
+            ),
           ),
+
+          // Message Composer (Flat & Non-duplicating)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: const BoxDecoration(
-              color: AppColors.surface,
-              border: Border(top: BorderSide(color: AppColors.border)),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: surfaceColor,
+              border: Border(top: BorderSide(color: borderColor, width: 1)),
             ),
             child: SafeArea(
               child: Row(
@@ -192,16 +310,53 @@ class _AppointmentChatScreenState extends ConsumerState<AppointmentChatScreen> {
                       controller: _messageController,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _handleSendMessage(),
-                      decoration: const InputDecoration(
-                        hintText: 'Type a message...',
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      enabled: !_isSending,
+                      style: TextStyle(color: textPrimary, fontSize: 13.5),
+                      decoration: InputDecoration(
+                        hintText: 'Type an encrypted consultation message...',
+                        hintStyle: TextStyle(
+                            color: textSecondary.withOpacity(0.7),
+                            fontSize: 13),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        filled: true,
+                        fillColor: isDark
+                            ? AppColors.backgroundOf(context)
+                            : const Color(0xFFF8FAFC),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: BorderSide(color: borderColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                          borderSide: const BorderSide(
+                              color: AppColors.primary, width: 1.5),
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: _handleSendMessage,
-                    icon: const Icon(Icons.send_rounded, color: AppColors.primary),
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: _isSending ? borderColor : AppColors.primary,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: IconButton(
+                      onPressed: _isSending ? null : _handleSendMessage,
+                      icon: _isSending
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Icon(Icons.send_rounded,
+                              color: Colors.white, size: 20),
+                    ),
                   ),
                 ],
               ),

@@ -67,5 +67,30 @@ class UserNotificationService {
       // Best-effort delivery; silent fallback if offline
     }
   }
+
+  /// Marks a specific user notification as read in Firestore.
+  Future<void> markAsRead(String notificationId) async {
+    if (notificationId.isEmpty) return;
+    try {
+      await _firestore.collection('notifications').doc(notificationId).update({'isRead': true});
+    } catch (_) {}
+  }
+
+  /// Marks all notifications for a given user as read in Firestore.
+  Future<void> markAllAsReadForUser(String userId) async {
+    if (userId.isEmpty) return;
+    try {
+      final query = await _firestore
+          .collection('notifications')
+          .where('userId', isEqualTo: userId)
+          .where('isRead', isEqualTo: false)
+          .get();
+      final batch = _firestore.batch();
+      for (final doc in query.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+      await batch.commit();
+    } catch (_) {}
+  }
 }
 
