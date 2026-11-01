@@ -58,6 +58,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ref.invalidate(pendingDoctorsProvider);
       ref.invalidate(userAppointmentsProvider);
       ref.invalidate(verifiedDoctorsStreamProvider);
+      ref.invalidate(readNotificationsProvider);
 
       ref.read(currentUserProvider.notifier).state = user;
       if (mounted) {

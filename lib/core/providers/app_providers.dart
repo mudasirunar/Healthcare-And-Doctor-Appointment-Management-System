@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -92,6 +93,7 @@ Future<void> appSignOut(WidgetRef ref) async {
   ref.read(patientSelectedTabProvider.notifier).state = 0;
   ref.read(doctorSelectedTabProvider.notifier).state = 0;
   ref.read(currentUserProvider.notifier).state = null;
+  NotificationService.instance.stopListening();
 
   try {
     await ref.read(authRepositoryProvider).signOut();
@@ -108,6 +110,7 @@ Future<void> appSignOut(WidgetRef ref) async {
   ref.invalidate(pendingDoctorsProvider);
   ref.invalidate(userAppointmentsProvider);
   ref.invalidate(verifiedDoctorsStreamProvider);
+  ref.invalidate(readNotificationsProvider);
 }
 
 
@@ -136,28 +139,100 @@ final themeModeProvider = StateNotifierProvider<ThemeModeNotifier, ThemeMode>((r
   return ThemeModeNotifier();
 });
 
-// --- ADMIN NOTIFICATION READ STATE & PREFERENCES ---
+// --- ADMIN NOTIFICATION READ STATE & PREFERENCES (REMOTE FIRESTORE SYNCED) ---
 class ReadNotificationsNotifier extends StateNotifier<Set<String>> {
-  ReadNotificationsNotifier()
-      : super(PreferencesService.instance.getReadNotificationIds());
+  final Ref _ref;
+  StreamSubscription? _remoteSubscription;
+
+  ReadNotificationsNotifier(this._ref)
+      : super(PreferencesService.instance.getReadNotificationIds()) {
+    _initRemoteSync();
+  }
+
+  void _initRemoteSync() {
+    _ref.listen<UserModel?>(currentUserProvider, (prev, next) {
+      _remoteSubscription?.cancel();
+      _remoteSubscription = null;
+      if (next != null && next.isAdmin) {
+        _subscribeToRemote(next.id);
+      }
+    });
+
+    final current = _ref.read(currentUserProvider);
+    if (current != null && current.isAdmin) {
+      _subscribeToRemote(current.id);
+    }
+  }
+
+  void _subscribeToRemote(String userId) {
+    _remoteSubscription?.cancel();
+    _remoteSubscription = FirebaseFirestore.instance
+        .collection('users')
+        .doc(userId)
+        .snapshots()
+        .listen((snapshot) {
+      if (!snapshot.exists || snapshot.data() == null) return;
+      final rawList = snapshot.data()?['readNotificationIds'];
+      if (rawList is List) {
+        final remoteIds = rawList.map((e) => e.toString()).toSet();
+        final merged = {...state, ...remoteIds};
+        if (merged.length != state.length) {
+          state = merged;
+          PreferencesService.instance.markNotificationsRead(remoteIds);
+        }
+      }
+    }, onError: (e) {
+      debugPrint('Notice remote read notifications sync: $e');
+    });
+  }
 
   Future<void> markAsRead(String id) async {
     if (state.contains(id)) return;
     state = {...state, id};
     await PreferencesService.instance.markNotificationRead(id);
+
+    final user = _ref.read(currentUserProvider);
+    if (user != null && user.isAdmin) {
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.id).set({
+          'readNotificationIds': FieldValue.arrayUnion([id]),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Error syncing markAsRead to Firestore: $e');
+      }
+    }
   }
 
   Future<void> markAllAsRead(Iterable<String> ids) async {
-    final next = {...state, ...ids};
+    final list = ids.toList();
+    if (list.isEmpty) return;
+    final next = {...state, ...list};
     if (next.length == state.length) return;
     state = next;
-    await PreferencesService.instance.markNotificationsRead(ids);
+    await PreferencesService.instance.markNotificationsRead(list);
+
+    final user = _ref.read(currentUserProvider);
+    if (user != null && user.isAdmin) {
+      try {
+        await FirebaseFirestore.instance.collection('users').doc(user.id).set({
+          'readNotificationIds': FieldValue.arrayUnion(list),
+        }, SetOptions(merge: true));
+      } catch (e) {
+        debugPrint('Error syncing markAllAsRead to Firestore: $e');
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _remoteSubscription?.cancel();
+    super.dispose();
   }
 }
 
 final readNotificationsProvider =
     StateNotifierProvider<ReadNotificationsNotifier, Set<String>>((ref) {
-  return ReadNotificationsNotifier();
+  return ReadNotificationsNotifier(ref);
 });
 
 // --- LIVE FIREBASE REPOSITORIES ---

@@ -350,7 +350,8 @@ class _UnifiedNotificationsScreenState
     final textSecondary = AppColors.textSecondaryOf(context);
 
     // Provide role-specific notification stream / list
-    if (widget.role == NotificationRole.patient) {
+    if (widget.role == NotificationRole.patient ||
+        widget.role == NotificationRole.doctor) {
       final notificationsAsync = ref.watch(patientNotificationsStreamProvider);
 
       return _buildScaffold(
