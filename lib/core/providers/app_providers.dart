@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:healthcare_app/core/services/notification_service.dart';
@@ -25,6 +26,7 @@ class PatientNotificationItem {
   final String title;
   final String body;
   final String type;
+  final String? targetId;
   final String createdAt;
   final bool isRead;
 
@@ -34,6 +36,7 @@ class PatientNotificationItem {
     required this.title,
     required this.body,
     required this.type,
+    this.targetId,
     required this.createdAt,
     required this.isRead,
   });
@@ -45,6 +48,7 @@ class PatientNotificationItem {
       title: map['title'] as String? ?? 'Notification',
       body: map['body'] as String? ?? '',
       type: map['type'] as String? ?? 'general',
+      targetId: (map['targetId'] as String?) ?? (map['appointmentId'] as String?),
       createdAt: map['createdAt'] as String? ?? DateTime.now().toUtc().toIso8601String(),
       isRead: map['isRead'] as bool? ?? false,
     );
@@ -233,20 +237,27 @@ final filteredDoctorsProvider = FutureProvider<List<DoctorModel>>((ref) async {
 });
 
 // --- APPOINTMENTS ---
-final userAppointmentsProvider = FutureProvider<List<AppointmentModel>>((ref) async {
+final singleAppointmentStreamProvider = StreamProvider.family<AppointmentModel?, String>((ref, appointmentId) {
+  final repo = ref.watch(appointmentRepositoryProvider);
+  return repo.watchAppointment(appointmentId);
+});
+
+final userAppointmentsProvider = StreamProvider<List<AppointmentModel>>((ref) {
   final user = ref.watch(currentUserProvider);
-  if (user == null) return [];
+  if (user == null) return Stream.value(<AppointmentModel>[]);
   final repo = ref.watch(appointmentRepositoryProvider);
 
   if (user.isPatient) {
-    return repo.getAppointmentsForPatient(user.id);
+    final effectivePatientId = FirebaseAuth.instance.currentUser?.uid ?? user.id;
+    return repo.watchAppointmentsForPatient(effectivePatientId);
   } else if (user.isDoctor) {
     final docRepo = ref.watch(doctorRepositoryProvider);
-    final doc = await docRepo.getDoctorByUserId(user.id);
-    if (doc == null) return [];
-    return repo.getAppointmentsForDoctor(doc.id);
+    return Stream.fromFuture(docRepo.getDoctorByUserId(user.id)).asyncExpand((doc) {
+      final docId = doc?.id ?? user.id;
+      return repo.watchAppointmentsForDoctor(docId);
+    });
   } else {
-    return repo.getAllAppointments();
+    return repo.watchAppointments();
   }
 });
 
@@ -452,6 +463,9 @@ final adminNotificationsProvider = Provider<List<AdminNotificationItem>>((ref) {
       );
     }
   }
+
+  // Sort strictly by arrival timestamp descending (newest first, not grouped by action)
+  items.sort((a, b) => b.timestampIso.compareTo(a.timestampIso));
 
   return items;
 });

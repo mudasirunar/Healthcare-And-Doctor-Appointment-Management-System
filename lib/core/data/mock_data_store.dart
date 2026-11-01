@@ -35,9 +35,20 @@ class MockDataStore {
   final _doctorsStreamController = StreamController<List<DoctorModel>>.broadcast();
   final _specialtiesStreamController = StreamController<List<SpecialtyModel>>.broadcast();
 
-  Stream<List<AppointmentModel>> get appointmentsStream => _appointmentsStreamController.stream;
-  Stream<List<DoctorModel>> get doctorsStream => _doctorsStreamController.stream;
-  Stream<List<SpecialtyModel>> get specialtiesStream => _specialtiesStreamController.stream;
+  Stream<List<AppointmentModel>> get appointmentsStream async* {
+    yield _appointments.values.toList();
+    yield* _appointmentsStreamController.stream;
+  }
+
+  Stream<List<DoctorModel>> get doctorsStream async* {
+    yield _doctors.values.toList();
+    yield* _doctorsStreamController.stream;
+  }
+
+  Stream<List<SpecialtyModel>> get specialtiesStream async* {
+    yield _specialties.values.toList();
+    yield* _specialtiesStreamController.stream;
+  }
 
   void _notifyAppointments() {
     _appointmentsStreamController.add(_appointments.values.toList());
@@ -269,7 +280,7 @@ class MockDataStore {
         ),
       ],
       reasonForVisit: 'Occasional chest tightness and routine blood pressure follow-up.',
-      videoRoomId: 'room_apt_001',
+      videoRoomId: 'AB-12',
       createdAt: now.subtract(const Duration(hours: 4)).toIso8601String(),
       updatedAt: now.subtract(const Duration(hours: 3)).toIso8601String(),
     );
@@ -304,7 +315,7 @@ class MockDataStore {
       reasonForVisit: 'Severe migraine and light sensitivity.',
       consultationNotes: 'Patient showed symptoms of tension-type migraine exacerbated by screen fatigue. Advised hydration and sleep hygiene.',
       prescriptionId: 'rx_001',
-      videoRoomId: 'room_apt_past_001',
+      videoRoomId: 'BC-04',
       createdAt: pastTimeUtc.subtract(const Duration(days: 1)).toIso8601String(),
       updatedAt: pastTimeUtc.add(const Duration(minutes: 35)).toIso8601String(),
     );
@@ -489,7 +500,7 @@ class MockDataStore {
         ),
       ],
       reasonForVisit: reasonForVisit,
-      videoRoomId: 'room_$appointmentId',
+      videoRoomId: AppointmentModel.generateHospitalRoomName(appointmentId),
       createdAt: nowIso,
       updatedAt: nowIso,
     );

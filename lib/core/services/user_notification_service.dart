@@ -38,30 +38,38 @@ class UserNotificationService {
     }
   }
 
-  /// Dispatches an administrative update notification to a patient's account.
+  /// Dispatches an administrative or clinical update notification to a patient's account.
   Future<void> sendPatientNotification({
     required String patientUserId,
     required String title,
     required String body,
     String type = 'patient_profile_updated',
+    String? targetId,
+    String? appointmentId,
   }) async {
     if (patientUserId.isEmpty) return;
 
     try {
-      await _firestore.collection('notifications').add({
+      final effectiveTargetId = targetId ?? appointmentId;
+      final payloadData = <String, dynamic>{
         'userId': patientUserId,
         'title': title,
         'body': body,
         'type': type,
         'createdAt': DateTime.now().toUtc().toIso8601String(),
         'isRead': false,
-      });
+      };
+      if (effectiveTargetId != null) {
+        payloadData['targetId'] = effectiveTargetId;
+        payloadData['appointmentId'] = effectiveTargetId;
+      }
+      await _firestore.collection('notifications').add(payloadData);
 
       // Also trigger a local push notification
       await NotificationService.instance.showLocalNotification(
         title: title,
         body: body,
-        payload: 'patient_update:$patientUserId',
+        payload: 'patient_update:$patientUserId:${effectiveTargetId ?? ''}',
       );
     } catch (_) {
       // Best-effort delivery; silent fallback if offline

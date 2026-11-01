@@ -34,7 +34,10 @@ abstract class AppointmentRepository {
   Future<List<AppointmentModel>> getAppointmentsForDoctor(String doctorId);
   Future<List<AppointmentModel>> getAllAppointments();
   Future<AppointmentModel?> getAppointmentById(String id);
+  Stream<AppointmentModel?> watchAppointment(String id);
   Stream<List<AppointmentModel>> watchAppointments();
+  Stream<List<AppointmentModel>> watchAppointmentsForPatient(String patientId);
+  Stream<List<AppointmentModel>> watchAppointmentsForDoctor(String doctorId);
 
   bool isSlotBooked(String doctorId, DateTime slotUtc);
 

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/errors/app_exceptions.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/user_notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_time_utils.dart';
 import '../../../../core/widgets/app_dialog.dart';
@@ -133,7 +134,7 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
 
     try {
       final aptRepo = ref.read(appointmentRepositoryProvider);
-      await aptRepo.bookAppointment(
+      final apt = await aptRepo.bookAppointment(
         patientId: user.id,
         patientName: user.displayName,
         patientEmail: user.email,
@@ -144,22 +145,37 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         reasonForVisit: reason,
       );
 
+      // Notify patient of booking request
+      UserNotificationService.instance.sendPatientNotification(
+        patientUserId: user.id,
+        title: 'Booking Request Submitted',
+        body: 'Your consultation with ${doctor.doctorName} was submitted for ${DateTimeUtils.formatFullWithTimeZone(_selectedSlotUtc!.toIso8601String())}.',
+        type: 'appointment_requested',
+        targetId: apt.id,
+      );
+
       ref.invalidate(userAppointmentsProvider);
 
       if (mounted) {
         showDialog(
           context: context,
-          barrierDismissible: false,
+          barrierDismissible: true,
           builder: (ctx) => AppDialog(
             icon: Icons.check_circle_outline_rounded,
             tone: AppDialogTone.success,
             title: 'Consultation Confirmed',
             message:
                 'Your consultation with ${doctor.doctorName} has been booked for ${DateTimeUtils.formatFullWithTimeZone(_selectedSlotUtc!.toIso8601String())}.',
+            cancelLabel: 'Done',
+            onCancel: () {
+              Navigator.pop(ctx);
+              Navigator.pop(context);
+            },
             confirmLabel: 'View Appointments',
             onConfirm: () {
               Navigator.pop(ctx);
-              context.go('/patient/appointments');
+              ref.read(patientSelectedTabProvider.notifier).state = 1;
+              context.go('/patient');
             },
           ),
         );

@@ -24,8 +24,9 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final aptAsync = ref.watch(singleAppointmentStreamProvider(appointmentId));
     final allApts = ref.watch(allAppointmentsAdminProvider).valueOrNull ?? [];
-    final appointment =
+    final appointment = aptAsync.valueOrNull ??
         allApts.where((a) => a.id == appointmentId).firstOrNull;
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
@@ -102,7 +103,7 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                         size: 20,
                       ),
                       SizedBox(width: 10),
-                      Text('Cancel Consultation (Admin)'),
+                      Text('Cancel Consultation'),
                     ],
                   ),
                 ),
@@ -139,7 +140,7 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Duration: ${appointment.durationMinutes} minutes • Room: ${appointment.videoRoomId}',
+                  'Duration: ${appointment.durationMinutes} mins • Room: ${appointment.displayRoomName} • Booking #${appointment.id.length > 8 ? appointment.id.substring(0, 8).toUpperCase() : appointment.id.toUpperCase()}',
                   style: AppTypography.caption.copyWith(color: textSecondary),
                 ),
               ],
@@ -308,7 +309,7 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                     appointment.cancellationReason!.isNotEmpty) ...[
                   const SizedBox(height: 16),
                   Text(
-                    'Cancellation / Decline Reason',
+                    'Cancellation Reason',
                     style: AppTypography.headline.copyWith(
                       color: AppColors.error,
                     ),
@@ -317,7 +318,8 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                   Text(
                     appointment.cancellationReason!,
                     style: AppTypography.bodyMedium.copyWith(
-                      color: AppColors.error,
+                      color: textSecondary,
+                      height: 1.4,
                     ),
                   ),
                 ],
@@ -503,7 +505,7 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                   color: AppColors.error,
                   size: 20,
                 ),
-                label: const Text('Cancel Consultation (Admin Action)'),
+                label: const Text('Cancel Consultation'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.error,
                   side: const BorderSide(color: AppColors.error),
@@ -628,6 +630,7 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                     body:
                         'Your appointment with ${appointment.doctorName} was cancelled by Admin. Reason: $reason',
                     type: 'appointment_cancelled_by_admin',
+                    targetId: appointment.id,
                   ),
                 ]),
               );
@@ -722,6 +725,7 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                     body:
                         'Your appointment with ${appointment.doctorName} has been confirmed by administration.',
                     type: 'appointment_confirmed',
+                    targetId: appointment.id,
                   ),
                 ]),
               );
@@ -816,6 +820,7 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                     body:
                         'Your consultation with ${appointment.doctorName} was marked completed by administration.',
                     type: 'appointment_completed',
+                    targetId: appointment.id,
                   ),
                 ]),
               );

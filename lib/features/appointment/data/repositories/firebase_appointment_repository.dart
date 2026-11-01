@@ -78,7 +78,7 @@ class FirebaseAppointmentRepository implements AppointmentRepository {
           ),
         ],
         reasonForVisit: reasonForVisit,
-        videoRoomId: 'room_${appointmentDocRef.id}',
+        videoRoomId: AppointmentModel.generateHospitalRoomName(appointmentDocRef.id),
         createdAt: nowIso,
         updatedAt: nowIso,
       );
@@ -256,9 +256,41 @@ class FirebaseAppointmentRepository implements AppointmentRepository {
   }
 
   @override
+  Stream<AppointmentModel?> watchAppointment(String id) {
+    return _firestore.collection('appointments').doc(id).snapshots().map((doc) {
+      if (!doc.exists || doc.data() == null) return null;
+      return AppointmentModel.fromMap(doc.data()!, id: doc.id);
+    });
+  }
+
+  @override
   Stream<List<AppointmentModel>> watchAppointments() {
     return _firestore.collection('appointments').snapshots().map((s) =>
         s.docs.map((d) => AppointmentModel.fromMap(d.data(), id: d.id)).toList()
+          ..sort((a, b) => b.scheduledTimeUtc.compareTo(a.scheduledTimeUtc)));
+  }
+
+  @override
+  Stream<List<AppointmentModel>> watchAppointmentsForPatient(String patientId) {
+    return _firestore
+        .collection('appointments')
+        .where('patientId', isEqualTo: patientId)
+        .snapshots()
+        .map((s) => s.docs
+            .map((d) => AppointmentModel.fromMap(d.data(), id: d.id))
+            .toList()
+          ..sort((a, b) => b.scheduledTimeUtc.compareTo(a.scheduledTimeUtc)));
+  }
+
+  @override
+  Stream<List<AppointmentModel>> watchAppointmentsForDoctor(String doctorId) {
+    return _firestore
+        .collection('appointments')
+        .where('doctorId', isEqualTo: doctorId)
+        .snapshots()
+        .map((s) => s.docs
+            .map((d) => AppointmentModel.fromMap(d.data(), id: d.id))
+            .toList()
           ..sort((a, b) => b.scheduledTimeUtc.compareTo(a.scheduledTimeUtc)));
   }
 

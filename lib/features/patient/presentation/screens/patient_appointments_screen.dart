@@ -9,12 +9,18 @@ import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
+import 'patient_appointment_detail_screen.dart';
 import 'patient_doctors_screen.dart';
 
 class PatientAppointmentsScreen extends ConsumerWidget {
   final ScrollController? scrollController;
+  final bool isStandalone;
 
-  const PatientAppointmentsScreen({super.key, this.scrollController});
+  const PatientAppointmentsScreen({
+    super.key,
+    this.scrollController,
+    this.isStandalone = false,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -29,25 +35,69 @@ class PatientAppointmentsScreen extends ConsumerWidget {
       length: 3,
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        appBar: PreferredSize(
-          preferredSize: const Size.fromHeight(48),
-          child: Container(
-            color: surfaceColor,
-            child: TabBar(
-              labelColor: AppColors.primary,
-              unselectedLabelColor: textSecondary,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 3,
-              labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-              unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-              tabs: const [
-                Tab(text: 'Upcoming'),
-                Tab(text: 'Completed'),
-                Tab(text: 'Cancelled'),
-              ],
-            ),
-          ),
-        ),
+        appBar: isStandalone
+            ? AppBar(
+                backgroundColor: surfaceColor,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  color: textPrimary,
+                  onPressed: () {
+                    if (Navigator.canPop(context)) {
+                      Navigator.pop(context);
+                    } else {
+                      context.go('/patient');
+                    }
+                  },
+                ),
+                title: Text(
+                  'My Consultations',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
+                  ),
+                ),
+                bottom: PreferredSize(
+                  preferredSize: const Size.fromHeight(48),
+                  child: Container(
+                    color: surfaceColor,
+                    child: TabBar(
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: textSecondary,
+                      indicatorColor: AppColors.primary,
+                      indicatorWeight: 3,
+                      labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                      unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                      tabs: const [
+                        Tab(text: 'Upcoming'),
+                        Tab(text: 'Completed'),
+                        Tab(text: 'Cancelled'),
+                      ],
+                    ),
+                  ),
+                ),
+              )
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: Container(
+                  color: surfaceColor,
+                  child: TabBar(
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: textSecondary,
+                    indicatorColor: AppColors.primary,
+                    indicatorWeight: 3,
+                    labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                    tabs: const [
+                      Tab(text: 'Upcoming'),
+                      Tab(text: 'Completed'),
+                      Tab(text: 'Cancelled'),
+                    ],
+                  ),
+                ),
+              ) as PreferredSizeWidget,
         body: appointmentsAsync.when(
           data: (appointments) {
             final upcoming = appointments.where((a) =>
@@ -259,166 +309,325 @@ class _AppointmentsList extends ConsumerWidget {
       itemCount: appointments.length,
       itemBuilder: (context, index) {
         final apt = appointments[index];
+        final bookingCode = apt.id.length > 8 ? apt.id.substring(0, 8).toUpperCase() : apt.id.toUpperCase();
 
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
             color: surfaceColor,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(color: borderColor),
           ),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Booking #${apt.id.length > 8 ? apt.id.substring(0, 8).toUpperCase() : apt.id.toUpperCase()}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: textSecondary,
-                      letterSpacing: 0.5,
-                    ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => PatientAppointmentDetailScreen(appointmentId: apt.id),
                   ),
-                  StatusBadge(status: apt.status),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Text(
-                apt.doctorName,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                apt.doctorSpecialty,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  color: isDark ? surfaceColor : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: borderColor.withOpacity(0.5)),
-                ),
-                child: Row(
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.schedule_rounded, size: 16, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        DateTimeUtils.formatFullWithTimeZone(apt.scheduledTimeUtc),
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w600,
-                          color: textPrimary,
+                    // Top: Doctor Profile & Status
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        CircleAvatar(
+                          radius: 20,
+                          backgroundColor: AppColors.primaryLight,
+                          child: Text(
+                            apt.doctorName.isNotEmpty
+                                ? (apt.doctorName.startsWith('Dr.') && apt.doctorName.length > 4
+                                    ? apt.doctorName.substring(4, 5).toUpperCase()
+                                    : apt.doctorName[0].toUpperCase())
+                                : 'D',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                apt.doctorName,
+                                style: TextStyle(
+                                  fontSize: 15.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: textPrimary,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                apt.doctorSpecialty,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFF60A5FA) : AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            StatusBadge(status: apt.status),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              size: 18,
+                              color: textSecondary.withOpacity(0.4),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 12),
+                    Divider(height: 1, thickness: 1, color: borderColor),
+                    const SizedBox(height: 12),
+
+                    // Flat Schedule & Room Metadata Box
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withOpacity(0.03)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: borderColor),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_today_rounded,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  DateTimeUtils.formatFullWithTimeZone(apt.scheduledTimeUtc),
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.meeting_room_outlined,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Duration: ${apt.durationMinutes} mins • Room: ${apt.displayRoomName} • Booking #$bookingCode',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: textSecondary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    if (apt.reasonForVisit.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Reason: ',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: textSecondary,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              apt.reasonForVisit,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w400,
+                                color: textPrimary,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+
+                    if (apt.cancellationReason != null && apt.cancellationReason!.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.error.withOpacity(0.06),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.error.withOpacity(0.2)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.info_outline_rounded,
+                              size: 15,
+                              color: AppColors.error,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: RichText(
+                                text: TextSpan(
+                                  children: [
+                                    const TextSpan(
+                                      text: 'Cancellation Reason: ',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.error,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: apt.cancellationReason!,
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w400,
+                                        color: textSecondary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
+                    ],
+
+                    // Action Buttons Row
+                    if (apt.status == AppointmentStatus.confirmed ||
+                        apt.status == AppointmentStatus.inProgress ||
+                        apt.status == AppointmentStatus.requested ||
+                        apt.prescriptionId != null) ...[
+                      const SizedBox(height: 12),
+                      Divider(height: 1, thickness: 1, color: borderColor),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (apt.status == AppointmentStatus.requested ||
+                              apt.status == AppointmentStatus.confirmed) ...[
+                            OutlinedButton.icon(
+                              onPressed: () => _showCancelDialog(context, ref, apt),
+                              icon: const Icon(Icons.event_busy_rounded, size: 14),
+                              label: const Text('Cancel'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.error,
+                                side: BorderSide(color: AppColors.error.withOpacity(0.4)),
+                                minimumSize: const Size(82, 34),
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                          ] else ...[
+                            const Spacer(),
+                          ],
+
+                          if (apt.status == AppointmentStatus.confirmed ||
+                              apt.status == AppointmentStatus.inProgress) ...[
+                            OutlinedButton.icon(
+                              onPressed: () => context.push('/consultation/chat/${apt.id}'),
+                              icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
+                              label: const Text('Chat'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: textPrimary,
+                                side: BorderSide(color: borderColor),
+                                minimumSize: const Size(78, 34),
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: () => context.push('/consultation/room/${apt.id}'),
+                              icon: const Icon(Icons.videocam_rounded, size: 15),
+                              label: const Text('Join Video'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                minimumSize: const Size(106, 34),
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ],
+
+                          if (apt.prescriptionId != null) ...[
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: () => context.push('/prescription/${apt.prescriptionId}'),
+                              icon: const Icon(Icons.description_outlined, size: 14),
+                              label: const Text('Prescription'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.secondary,
+                                foregroundColor: Colors.white,
+                                elevation: 0,
+                                minimumSize: const Size(116, 34),
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
-              if (apt.reasonForVisit.isNotEmpty) ...[
-                const SizedBox(height: 10),
-                Text(
-                  'Reason: "${apt.reasonForVisit}"',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontStyle: FontStyle.italic,
-                    color: textSecondary,
-                  ),
-                ),
-              ],
-              if (apt.cancellationReason != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Cancellation Note: ${apt.cancellationReason}',
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: AppColors.error,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 14),
-              Divider(height: 1, thickness: 1, color: borderColor),
-              const SizedBox(height: 10),
-
-              // Action Buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  if (apt.status == AppointmentStatus.confirmed ||
-                      apt.status == AppointmentStatus.inProgress) ...[
-                    OutlinedButton.icon(
-                      onPressed: () => context.push('/consultation/chat/${apt.id}'),
-                      icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
-                      label: const Text('Chat'),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(76, 36),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton.icon(
-                      onPressed: () => context.push('/consultation/room/${apt.id}'),
-                      icon: const Icon(Icons.videocam_rounded, size: 15),
-                      label: const Text('Join Video'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        minimumSize: const Size(100, 36),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-
-                  if (apt.status == AppointmentStatus.requested ||
-                      apt.status == AppointmentStatus.confirmed) ...[
-                    TextButton(
-                      onPressed: () => _showCancelDialog(context, ref, apt),
-                      style: TextButton.styleFrom(
-                        foregroundColor: AppColors.error,
-                        minimumSize: const Size(60, 36),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
-                    ),
-                  ],
-
-                  if (apt.prescriptionId != null) ...[
-                    ElevatedButton.icon(
-                      onPressed: () => context.push('/prescription/${apt.prescriptionId}'),
-                      icon: const Icon(Icons.description_outlined, size: 15),
-                      label: const Text('View Prescription'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.secondary,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        minimumSize: const Size(130, 36),
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
+            ),
           ),
         );
       },

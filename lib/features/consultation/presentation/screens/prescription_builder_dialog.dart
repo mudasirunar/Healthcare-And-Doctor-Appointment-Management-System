@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 import 'package:healthcare_app/core/providers/app_providers.dart';
+import 'package:healthcare_app/core/services/user_notification_service.dart';
 import 'package:healthcare_app/core/theme/app_colors.dart';
 import 'package:healthcare_app/core/theme/app_typography.dart';
 import 'package:healthcare_app/core/widgets/app_snack_bar.dart';
@@ -123,6 +124,14 @@ class _PrescriptionBuilderDialogState extends ConsumerState<PrescriptionBuilderD
         targetStatus: AppointmentStatus.completed,
         actorUserId: user?.id ?? 'doctor',
         note: 'Doctor issued digital prescription ($rxId) and finalized consultation session.',
+      );
+
+      UserNotificationService.instance.sendPatientNotification(
+        patientUserId: widget.appointment.patientId,
+        title: 'Digital Prescription Issued',
+        body: 'Dr. ${widget.appointment.doctorName} has issued a digital prescription for your consultation.',
+        type: 'prescription_issued',
+        targetId: widget.appointment.id,
       );
 
       widget.onPrescriptionCreated();

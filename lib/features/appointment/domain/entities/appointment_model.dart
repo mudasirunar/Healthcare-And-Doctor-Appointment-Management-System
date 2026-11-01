@@ -99,6 +99,33 @@ class AppointmentModel {
   final String createdAt;
   final String updatedAt;
 
+  /// Formats the room identifier into a compact hospital room code (e.g., "AB-12", "BC-04").
+  String get displayRoomName {
+    if (videoRoomId.isEmpty) return 'AB-12';
+
+    // If it's already a clean short code (e.g. AB-12, BC-04), return it
+    if (RegExp(r'^[A-Z]{1,2}-\d{1,2}$').hasMatch(videoRoomId)) {
+      return videoRoomId;
+    }
+
+    final cleanId = videoRoomId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    final hash = cleanId.codeUnits.fold(0, (acc, c) => acc + c);
+    final wings = ['AB', 'BC', 'AC', 'CD', 'A', 'B', 'C'];
+    final wing = wings[hash % wings.length];
+    final num = ((hash ~/ 7) % 30 + 1).toString().padLeft(2, '0');
+    return '$wing-$num';
+  }
+
+  /// Generates a compact hospital room code based on a seed ID (e.g., "AB-12").
+  static String generateHospitalRoomName(String seedId) {
+    final cleanId = seedId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    final hash = cleanId.codeUnits.fold(0, (acc, c) => acc + c);
+    final wings = ['AB', 'BC', 'AC', 'CD', 'A', 'B', 'C'];
+    final wing = wings[hash % wings.length];
+    final num = ((hash ~/ 7) % 30 + 1).toString().padLeft(2, '0');
+    return '$wing-$num';
+  }
+
   const AppointmentModel({
     required this.id,
     required this.patientId,

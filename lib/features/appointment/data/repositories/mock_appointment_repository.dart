@@ -93,8 +93,35 @@ class MockAppointmentRepository implements AppointmentRepository {
   }
 
   @override
+  Stream<AppointmentModel?> watchAppointment(String id) {
+    return _dataStore.appointmentsStream.map((list) {
+      return list.where((a) => a.id == id).firstOrNull;
+    });
+  }
+
+  @override
   Stream<List<AppointmentModel>> watchAppointments() {
     return _dataStore.appointmentsStream;
+  }
+
+  @override
+  Stream<List<AppointmentModel>> watchAppointmentsForPatient(String patientId) {
+    return _dataStore.appointmentsStream.map((allList) {
+      final list = allList.where((a) => a.patientId == patientId).toList();
+      list.sort((a, b) => b.scheduledTimeUtc.compareTo(a.scheduledTimeUtc));
+      return list;
+    });
+  }
+
+  @override
+  Stream<List<AppointmentModel>> watchAppointmentsForDoctor(String doctorId) {
+    return _dataStore.appointmentsStream.map((allList) {
+      final list = allList
+          .where((a) => a.doctorId == doctorId || a.doctorId == 'doc_$doctorId')
+          .toList();
+      list.sort((a, b) => b.scheduledTimeUtc.compareTo(a.scheduledTimeUtc));
+      return list;
+    });
   }
 
   @override

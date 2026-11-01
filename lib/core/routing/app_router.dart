@@ -57,7 +57,7 @@ final appRouter = GoRouter(
     ),
     GoRoute(
       path: '/patient/appointments',
-      builder: (context, state) => const PatientAppointmentsScreen(),
+      builder: (context, state) => const PatientAppointmentsScreen(isStandalone: true),
     ),
     GoRoute(
       path: '/patient/notifications',

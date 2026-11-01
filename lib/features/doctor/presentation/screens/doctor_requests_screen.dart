@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/user_notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
@@ -20,6 +21,13 @@ class DoctorRequestsScreen extends ConsumerWidget {
         targetStatus: AppointmentStatus.confirmed,
         actorUserId: user?.id ?? 'doctor',
         note: 'Doctor accepted appointment request',
+      );
+      UserNotificationService.instance.sendPatientNotification(
+        patientUserId: apt.patientId,
+        title: 'Consultation Confirmed',
+        body: 'Dr. ${apt.doctorName} confirmed your appointment request.',
+        type: 'appointment_confirmed',
+        targetId: apt.id,
       );
       ref.invalidate(userAppointmentsProvider);
       if (context.mounted) {
@@ -64,14 +72,23 @@ class DoctorRequestsScreen extends ConsumerWidget {
           Navigator.pop(ctx);
           final user = ref.read(currentUserProvider);
           try {
+            final reason = reasonController.text.trim().isNotEmpty
+                ? reasonController.text.trim()
+                : 'Doctor declined request';
             await ref.read(appointmentRepositoryProvider).updateStatus(
                   appointmentId: apt.id,
                   targetStatus: AppointmentStatus.rejected,
                   actorUserId: user?.id ?? 'doctor',
-                  note: reasonController.text.trim().isNotEmpty
-                      ? reasonController.text.trim()
-                      : 'Doctor declined request',
+                  cancellationReason: reason,
+                  note: reason,
                 );
+            UserNotificationService.instance.sendPatientNotification(
+              patientUserId: apt.patientId,
+              title: 'Consultation Request Declined',
+              body: 'Dr. ${apt.doctorName} could not accept your booking request: $reason',
+              type: 'appointment_declined',
+              targetId: apt.id,
+            );
             ref.invalidate(userAppointmentsProvider);
             if (context.mounted) {
               AppSnackBar.showInfo(context, 'Appointment declined.');
