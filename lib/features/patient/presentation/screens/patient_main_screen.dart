@@ -11,6 +11,7 @@ import 'patient_home_screen.dart';
 import 'patient_appointments_screen.dart';
 import 'patient_prescriptions_screen.dart';
 import 'patient_settings_screen.dart';
+import 'patient_notifications_screen.dart';
 
 class PatientMainScreen extends ConsumerStatefulWidget {
   const PatientMainScreen({super.key});
@@ -83,6 +84,7 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
   Widget build(BuildContext context) {
     final currentIndex = ref.watch(patientSelectedTabProvider);
     final appointmentsAsync = ref.watch(userAppointmentsProvider);
+    final unreadNotifs = ref.watch(unreadPatientNotificationsCountProvider);
     final upcomingCount = appointmentsAsync.value
             ?.where((a) =>
                 a.status == AppointmentStatus.confirmed ||
@@ -94,9 +96,12 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
     return Scaffold(
       backgroundColor: AppColors.backgroundOf(context),
       extendBody: true,
-      appBar: _buildContextualAppBar(context, tabIndex: currentIndex),
+      appBar: _buildContextualAppBar(
+        context,
+        tabIndex: currentIndex,
+        unreadNotificationsCount: unreadNotifs,
+      ),
       body: SafeArea(
-        top: currentIndex == 0, // Enforce status bar safe area protection for Discover tab
         bottom: false,
         child: IndexedStack(
           index: currentIndex,
@@ -109,9 +114,9 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
         scrollControllers: _scrollControllers,
         items: [
           const AppNavItem(
-            icon: Icons.explore_outlined,
-            activeIcon: Icons.explore_rounded,
-            label: 'Discover',
+            icon: Icons.dashboard_outlined,
+            activeIcon: Icons.dashboard_rounded,
+            label: 'Dashboard',
           ),
           AppNavItem(
             icon: Icons.calendar_today_outlined,
@@ -134,21 +139,49 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
     );
   }
 
-  PreferredSizeWidget? _buildContextualAppBar(BuildContext context, {required int tabIndex}) {
-    if (tabIndex == 0) {
-      return null; // PatientHomeScreen renders its own top greetings header safely inside SafeArea
-    }
-
+  PreferredSizeWidget _buildContextualAppBar(
+    BuildContext context, {
+    required int tabIndex,
+    required int unreadNotificationsCount,
+  }) {
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
     final surfaceColor = AppColors.surfaceOf(context);
     final borderColor = AppColors.borderOf(context);
 
-    final (String title, String subtitle) = switch (tabIndex) {
-      1 => ('My Consultations', 'Scheduled appointments & history'),
-      2 => ('Medical Prescriptions', 'Prescriptions issued by your specialists'),
-      3 => ('Account & Settings', 'Clinical profile, preferences & security'),
-      _ => ('Patient Portal', 'Health & Appointments'),
+    final notificationBell = _NotificationBellButton(
+      unreadCount: unreadNotificationsCount,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const PatientNotificationsScreen(),
+          ),
+        );
+      },
+    );
+
+    final (String title, String subtitle, Widget? trailing) = switch (tabIndex) {
+      0 => (
+          'Patient Dashboard',
+          'Appointments, Health Stats & Care',
+          notificationBell,
+        ),
+      1 => (
+          'My Consultations',
+          'Scheduled appointments & history',
+          notificationBell,
+        ),
+      2 => (
+          'Medical Prescriptions',
+          'Prescriptions issued by your specialists',
+          notificationBell,
+        ),
+      _ => (
+          'Account & Settings',
+          'Clinical profile, preferences & security',
+          null,
+        ),
     };
 
     return PreferredSize(
@@ -187,9 +220,69 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
                     ],
                   ),
                 ),
+                ?trailing,
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationBellButton extends StatelessWidget {
+  final int unreadCount;
+  final VoidCallback onTap;
+
+  const _NotificationBellButton({
+    required this.unreadCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariantOf(context),
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.borderOf(context)),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              unreadCount > 0
+                  ? Icons.notifications_rounded
+                  : Icons.notifications_none_rounded,
+              size: 22,
+              color: unreadCount > 0 ? AppColors.primary : textPrimary,
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.surfaceOf(context),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

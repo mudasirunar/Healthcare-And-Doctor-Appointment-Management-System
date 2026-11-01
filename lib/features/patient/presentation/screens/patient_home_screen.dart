@@ -8,9 +8,15 @@ import '../../../../core/utils/date_time_utils.dart';
 import '../../../../core/utils/smart_search_utils.dart';
 import '../../../../core/widgets/app_search_bar.dart';
 import '../../../../core/widgets/auto_center_filter_bar.dart';
+import '../../../../core/widgets/state_views.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
+import '../../../consultation/presentation/screens/appointment_chat_screen.dart';
+import '../../../consultation/presentation/screens/video_consultation_screen.dart';
+import 'booking_screen.dart';
 import 'doctor_details_screen.dart';
+import 'patient_specialties_screen.dart';
+import 'patient_specialty_doctors_screen.dart';
 
 class PatientHomeScreen extends ConsumerStatefulWidget {
   final ScrollController? scrollController;
@@ -24,6 +30,8 @@ class PatientHomeScreen extends ConsumerStatefulWidget {
 class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   late final ScrollController _scrollController;
+  final GlobalKey _directoryKey = GlobalKey();
+  final GlobalKey _precautionsKey = GlobalKey();
 
   String _selectedSpecialty = 'All';
   double? _selectedMinRating; // null | 4.0 | 4.5 | 4.8
@@ -43,6 +51,17 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
       _scrollController.dispose();
     }
     super.dispose();
+  }
+
+  void _scrollToKey(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx != null) {
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOutCubic,
+      );
+    }
   }
 
   void _showFilterModal(BuildContext context) {
@@ -250,7 +269,7 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
         child: Text(
           label,
           style: TextStyle(
-            fontSize: 12,
+            fontSize: 12.5,
             fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
             color: isSelected ? Colors.white : textSecondary,
           ),
@@ -268,21 +287,96 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
     final textSecondary = AppColors.textSecondaryOf(context);
 
     final currentUser = ref.watch(currentUserProvider);
-    final unreadNotifs = ref.watch(unreadPatientNotificationsCountProvider);
     final specialtiesAsync = ref.watch(specialtiesProvider);
     final appointmentsAsync = ref.watch(userAppointmentsProvider);
-    final upcomingAppointments = appointmentsAsync.value
-            ?.where((a) =>
-                a.status == AppointmentStatus.confirmed ||
-                a.status == AppointmentStatus.requested ||
-                a.status == AppointmentStatus.inProgress)
-            .toList() ??
-        [];
+    final allAppointments = appointmentsAsync.valueOrNull ?? [];
+
+    final upcomingAppointments = allAppointments
+        .where((a) =>
+            a.status == AppointmentStatus.confirmed ||
+            a.status == AppointmentStatus.requested ||
+            a.status == AppointmentStatus.inProgress)
+        .toList();
+
+    final completedAppointments = allAppointments
+        .where((a) => a.status == AppointmentStatus.completed)
+        .toList();
+
+    final visitedDoctorIds = completedAppointments
+        .map((a) => a.doctorId)
+        .where((id) => id.isNotEmpty)
+        .toSet();
 
     final doctorsAsync = ref.watch(verifiedDoctorsStreamProvider);
+    final allDoctors = doctorsAsync.valueOrNull ?? [];
 
-    final hasActiveFilter =
-        _selectedMinRating != null || _selectedMaxFee != null || _sortMode != 'rating';
+    // Map visited doctor IDs to DoctorModel instances
+    final visitedDoctors = allDoctors
+        .where((d) => visitedDoctorIds.contains(d.id))
+        .toList();
+
+    // Compute specialties list
+    final specialties = specialtiesAsync.valueOrNull ?? [];
+    final specialtyNames = ['All', ...specialties.map((s) => s.name)];
+
+    // Calculate doctor count per specialty
+    final Map<String, int> doctorCountBySpecialtyId = {};
+    for (final spec in specialties) {
+      doctorCountBySpecialtyId[spec.id] =
+          allDoctors.where((d) => d.specialtyId == spec.id).length;
+    }
+
+    // Top-rated specialists (rating >= 4.5, sorted by rating desc, review count desc)
+    final topRatedDoctors = List<DoctorModel>.from(allDoctors)
+      ..sort((a, b) {
+        final rCmp = b.rating.compareTo(a.rating);
+        if (rCmp != 0) return rCmp;
+        return b.reviewCount.compareTo(a.reviewCount);
+      });
+    final topSpecialistsPreview = topRatedDoctors.take(4).toList();
+
+    // Check if search or active filters are applied
+    final searchQuery = _searchController.text.trim();
+    final hasActiveFilter = _selectedMinRating != null ||
+        _selectedMaxFee != null ||
+        _sortMode != 'rating';
+    final isSearchMode = searchQuery.isNotEmpty ||
+        _selectedSpecialty != 'All' ||
+        hasActiveFilter;
+
+    // Filter doctors for the full directory view
+    List<DoctorModel> filteredDoctors = List<DoctorModel>.from(allDoctors);
+    if (_selectedSpecialty != 'All') {
+      filteredDoctors = filteredDoctors
+          .where((d) => d.specialtyName.toLowerCase() == _selectedSpecialty.toLowerCase())
+          .toList();
+    }
+    if (_selectedMinRating != null) {
+      filteredDoctors = filteredDoctors
+          .where((d) => d.rating >= _selectedMinRating!)
+          .toList();
+    }
+    if (_selectedMaxFee != null) {
+      filteredDoctors = filteredDoctors
+          .where((d) => d.consultationFee <= _selectedMaxFee!)
+          .toList();
+    }
+    if (searchQuery.isNotEmpty) {
+      filteredDoctors = SmartSearchEngine.filterAndSort<DoctorModel>(
+        items: filteredDoctors,
+        query: searchQuery,
+        primaryTextBuilder: (d) => d.doctorName,
+        secondaryTextsBuilder: (d) => [d.specialtyName, d.bio],
+      );
+    } else {
+      if (_sortMode == 'rating') {
+        filteredDoctors.sort((a, b) => b.rating.compareTo(a.rating));
+      } else if (_sortMode == 'fee') {
+        filteredDoctors.sort((a, b) => a.consultationFee.compareTo(b.consultationFee));
+      } else if (_sortMode == 'exp') {
+        filteredDoctors.sort((a, b) => b.experienceYears.compareTo(a.experienceYears));
+      }
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -290,92 +384,106 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
         controller: _scrollController,
         physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
         slivers: [
-          // 1. Welcome & Greeting Flat Header with Notification & Chat Shortcuts
+          // 1. Dashboard Greetings & Quick Search Bar
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 14, 20, 10),
-              child: Row(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 22,
-                    backgroundColor: AppColors.primaryLight,
-                    backgroundImage: currentUser?.avatarUrl != null
-                        ? NetworkImage(currentUser!.avatarUrl!)
-                        : null,
-                    child: currentUser?.avatarUrl == null
-                        ? Text(
-                            currentUser != null && currentUser.displayName.isNotEmpty
-                                ? currentUser.displayName[0].toUpperCase()
-                                : 'P',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.primary,
-                            ),
-                          )
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Welcome back,',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: textSecondary,
-                          ),
-                        ),
-                        Text(
-                          currentUser?.displayName ?? 'Patient',
-                          style: TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w800,
-                            color: textPrimary,
-                            letterSpacing: -0.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Chats Hub Shortcut
-                  IconButton(
-                    icon: const Icon(Icons.chat_outlined, size: 22),
-                    color: textPrimary,
-                    tooltip: 'Consultation Messages',
-                    onPressed: () => context.push('/patient/chats'),
-                  ),
-                  // Notification Bell with Unread Badge
-                  Stack(
+                  Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.notifications_none_rounded, size: 24),
-                        color: textPrimary,
-                        tooltip: 'Notifications',
-                        onPressed: () => context.push('/patient/notifications'),
+                      CircleAvatar(
+                        radius: 20,
+                        backgroundColor: AppColors.primaryLight,
+                        backgroundImage: currentUser?.avatarUrl != null
+                            ? NetworkImage(currentUser!.avatarUrl!)
+                            : null,
+                        child: currentUser?.avatarUrl == null
+                            ? Text(
+                                currentUser != null && currentUser.displayName.isNotEmpty
+                                    ? currentUser.displayName[0].toUpperCase()
+                                    : 'P',
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              )
+                            : null,
                       ),
-                      if (unreadNotifs > 0)
-                        Positioned(
-                          right: 8,
-                          top: 8,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: AppColors.error,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Text(
-                              unreadNotifs > 9 ? '9+' : '$unreadNotifs',
-                              style: const TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Welcome back,',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                                color: textSecondary,
                               ),
                             ),
+                            Text(
+                              currentUser?.displayName ?? 'Patient',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: textPrimary,
+                                letterSpacing: -0.3,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Direct Messages shortcut
+                      IconButton(
+                        icon: const Icon(Icons.chat_outlined, size: 22),
+                        color: textPrimary,
+                        tooltip: 'Consultations Chat',
+                        onPressed: () => context.push('/patient/chats'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Search Bar with Filter Trigger
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppSearchBar(
+                          controller: _searchController,
+                          hintText: 'Search doctors, specialties, clinics...',
+                          onChanged: (_) => setState(() {}),
+                          onClear: () => setState(() {}),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: () => _showFilterModal(context),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: hasActiveFilter
+                                ? AppColors.primary
+                                : (isDark ? surfaceColor : const Color(0xFFF1F5F9)),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: hasActiveFilter ? AppColors.primary : borderColor,
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.tune_rounded,
+                            size: 20,
+                            color: hasActiveFilter ? Colors.white : textPrimary,
                           ),
                         ),
+                      ),
                     ],
                   ),
                 ],
@@ -383,67 +491,7 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
             ),
           ),
 
-          // 2. Upcoming Consultation Banner (Flat minimal container with live Call/Chat CTA)
-          if (upcomingAppointments.isNotEmpty) ...[
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 6, 20, 12),
-                child: _buildUpcomingConsultationBanner(
-                  context,
-                  upcomingAppointments.first,
-                  isDark: isDark,
-                  surfaceColor: surfaceColor,
-                  borderColor: borderColor,
-                  textPrimary: textPrimary,
-                  textSecondary: textSecondary,
-                ),
-              ),
-            ),
-          ],
-
-          // 3. Search Bar with Advanced Filter Trigger
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: AppSearchBar(
-                      controller: _searchController,
-                      hintText: 'Search doctors, specialties, clinics...',
-                      onChanged: (_) => setState(() {}),
-                      onClear: () => setState(() {}),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  InkWell(
-                    onTap: () => _showFilterModal(context),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: hasActiveFilter
-                            ? AppColors.primary
-                            : (isDark ? surfaceColor : const Color(0xFFF1F5F9)),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: hasActiveFilter ? AppColors.primary : borderColor,
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.tune_rounded,
-                        size: 20,
-                        color: hasActiveFilter ? Colors.white : textPrimary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          // 4. Active Filters Strip
+          // 2. Active Filters Strip
           if (hasActiveFilter)
             SliverToBoxAdapter(
               child: Padding(
@@ -453,23 +501,30 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
                   child: Row(
                     children: [
                       if (_selectedMinRating != null) ...[
-                        _buildActiveFilterTag('Rating ≥ $_selectedMinRating', () {
-                          setState(() => _selectedMinRating = null);
-                        }, borderColor, textSecondary),
+                        _buildActiveFilterTag(
+                          'Rating: ★ ${_selectedMinRating!}+',
+                          () => setState(() => _selectedMinRating = null),
+                          borderColor,
+                          textSecondary,
+                        ),
                         const SizedBox(width: 6),
                       ],
                       if (_selectedMaxFee != null) ...[
                         _buildActiveFilterTag(
-                            'Fee ≤ \$${_selectedMaxFee!.toStringAsFixed(0)}', () {
-                          setState(() => _selectedMaxFee = null);
-                        }, borderColor, textSecondary),
+                          'Max Fee: ≤ \$${_selectedMaxFee!.toInt()}',
+                          () => setState(() => _selectedMaxFee = null),
+                          borderColor,
+                          textSecondary,
+                        ),
                         const SizedBox(width: 6),
                       ],
                       if (_sortMode != 'rating') ...[
                         _buildActiveFilterTag(
-                            _sortMode == 'fee' ? 'Lowest Fee' : 'Most Experienced', () {
-                          setState(() => _sortMode = 'rating');
-                        }, borderColor, textSecondary),
+                          'Sort: ${_sortMode == 'fee' ? 'Lowest Fee' : 'Experience'}',
+                          () => setState(() => _sortMode = 'rating'),
+                          borderColor,
+                          textSecondary,
+                        ),
                         const SizedBox(width: 6),
                       ],
                       TextButton(
@@ -481,11 +536,11 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
                           });
                         },
                         style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 0),
                           minimumSize: Size.zero,
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: const Text('Clear', style: TextStyle(fontSize: 11)),
+                        child: const Text('Clear All', style: TextStyle(fontSize: 11)),
                       ),
                     ],
                   ),
@@ -493,141 +548,554 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
               ),
             ),
 
-          // 5. Auto-Centering Specialty Filter Bar
-          specialtiesAsync.when(
-            data: (specialties) {
-              final allFilters = ['All', ...specialties.map((s) => s.name)];
-              return SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8, bottom: 8),
-                  child: AutoCenterFilterBar(
-                    items: allFilters.map((category) {
-                      final isSelected =
-                          _selectedSpecialty.toLowerCase() == category.toLowerCase();
-                      return AutoCenterFilterItem(
-                        id: category,
-                        label: category,
-                        isSelected: isSelected,
-                        onTap: () {
-                          setState(() {
-                            _selectedSpecialty = category;
-                          });
-                        },
-                      );
-                    }).toList(),
-                  ),
-                ),
-              );
-            },
-            loading: () => const SliverToBoxAdapter(
-              child: SizedBox(height: 48),
+          // 3. Specialties Horizontal Filter Chips Strip
+          SliverToBoxAdapter(
+            child: AutoCenterFilterBar(
+              items: specialtyNames.map((name) {
+                return AutoCenterFilterItem(
+                  id: name,
+                  label: name,
+                  isSelected: _selectedSpecialty == name,
+                  onTap: () => setState(() => _selectedSpecialty = name),
+                );
+              }).toList(),
             ),
-            error: (_, __) => const SliverToBoxAdapter(child: SizedBox.shrink()),
           ),
 
-          // 6. Section Header: Medical Departments & Specialists
+          // -------------------------------------------------------------
+          // DASHBOARD SECTIONS (Shown when not in active keyword search)
+          // -------------------------------------------------------------
+          if (!isSearchMode) ...[
+            // 4. Actionable Ongoing Consultation Ribbon (if any active appointment)
+            if (upcomingAppointments.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+                  child: _buildActionableConsultationRibbon(
+                    context,
+                    upcomingAppointments.first,
+                    isDark: isDark,
+                    surfaceColor: surfaceColor,
+                    borderColor: borderColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                  ),
+                ),
+              ),
+            ],
+
+            // 5. Personal Health & Consultation Stats Grid (2x2 Flat Cards)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        _DashboardMetricTile(
+                          title: 'Upcoming',
+                          value: '${upcomingAppointments.length}',
+                          subtitle: 'Scheduled visits',
+                          icon: Icons.calendar_month_outlined,
+                          onTap: () {
+                            ref.read(patientSelectedTabProvider.notifier).state = 1;
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        _DashboardMetricTile(
+                          title: 'Completed',
+                          value: '${completedAppointments.length}',
+                          subtitle: 'Past visits',
+                          icon: Icons.check_circle_outline_rounded,
+                          onTap: () {
+                            ref.read(patientSelectedTabProvider.notifier).state = 1;
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _DashboardMetricTile(
+                          title: 'Prescriptions',
+                          value: '${completedAppointments.where((a) => a.consultationNotes != null || a.prescriptionId != null).length}',
+                          subtitle: 'Active records',
+                          icon: Icons.medication_outlined,
+                          onTap: () {
+                            ref.read(patientSelectedTabProvider.notifier).state = 2;
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        _DashboardMetricTile(
+                          title: 'Specialists Visited',
+                          value: '${visitedDoctorIds.length}',
+                          subtitle: 'Care network',
+                          icon: Icons.people_outline_rounded,
+                          onTap: () {
+                            if (visitedDoctors.isNotEmpty) {
+                              _scrollToKey(_directoryKey);
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 6. Quick Action Dock
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                child: Row(
+                  children: [
+                    _QuickActionButton(
+                      icon: Icons.person_search_rounded,
+                      label: 'Find Doctor',
+                      onTap: () => _scrollToKey(_directoryKey),
+                    ),
+                    const SizedBox(width: 10),
+                    _QuickActionButton(
+                      icon: Icons.category_outlined,
+                      label: 'Specialties',
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const PatientSpecialtiesScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    _QuickActionButton(
+                      icon: Icons.receipt_long_outlined,
+                      label: 'Prescriptions',
+                      onTap: () {
+                        ref.read(patientSelectedTabProvider.notifier).state = 2;
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    _QuickActionButton(
+                      icon: Icons.health_and_safety_outlined,
+                      label: 'Precautions',
+                      onTap: () => _scrollToKey(_precautionsKey),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // 7. Medical Specialties Showcase (with Live Doctor Counts)
+            if (specialties.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Medical Specialties',
+                            style: AppTypography.headline.copyWith(
+                              fontSize: 17,
+                              color: textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Clinical departments & verified specialists',
+                            style: AppTypography.caption.copyWith(color: textSecondary),
+                          ),
+                        ],
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => const PatientSpecialtiesScreen(),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                        label: const Text('See All'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: SizedBox(
+                  height: 114,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: specialties.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (ctx, idx) {
+                      final spec = specialties[idx];
+                      final docCount = doctorCountBySpecialtyId[spec.id] ?? 0;
+
+                      return GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PatientSpecialtyDoctorsScreen(specialty: spec),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          width: 130,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: surfaceColor,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.medical_services_outlined,
+                                  color: AppColors.primary,
+                                  size: 18,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                spec.name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: AppTypography.bodyLarge.copyWith(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$docCount Specialist${docCount == 1 ? '' : 's'}',
+                                style: AppTypography.caption.copyWith(
+                                  fontSize: 10.5,
+                                  color: textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            ],
+
+            // 8. Top-Rated Specialists Section
+            if (topSpecialistsPreview.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Top-Rated Specialists',
+                            style: AppTypography.headline.copyWith(
+                              fontSize: 17,
+                              color: textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Highest patient reviews & recommendations',
+                            style: AppTypography.caption.copyWith(color: textSecondary),
+                          ),
+                        ],
+                      ),
+                      TextButton(
+                        onPressed: () => _scrollToKey(_directoryKey),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                        ),
+                        child: const Text('View All'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, idx) {
+                      final doc = topSpecialistsPreview[idx];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: surfaceColor,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: _FlatPatientDoctorRow(
+                          doctor: doc,
+                          surfaceColor: surfaceColor,
+                          borderColor: borderColor,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DoctorDetailsScreen(doctorId: doc.id),
+                              ),
+                            );
+                          },
+                          onBook: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => BookingScreen(doctorId: doc.id),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                    childCount: topSpecialistsPreview.length,
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            ],
+
+            // 9. Previously Visited Doctors Section (if any completed appointments)
+            if (visitedDoctors.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your Past Consultations',
+                        style: AppTypography.headline.copyWith(
+                          fontSize: 17,
+                          color: textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Doctors you have consulted previously for easy follow-up',
+                        style: AppTypography.caption.copyWith(color: textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, idx) {
+                      final doc = visitedDoctors[idx];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: surfaceColor,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: _FlatPatientDoctorRow(
+                          doctor: doc,
+                          surfaceColor: surfaceColor,
+                          borderColor: borderColor,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DoctorDetailsScreen(doctorId: doc.id),
+                              ),
+                            );
+                          },
+                          onBook: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => BookingScreen(doctorId: doc.id),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                    childCount: visitedDoctors.length,
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            ],
+
+            // 10. Clinical Precautions & Health Reminders Feed
+            SliverToBoxAdapter(
+              child: Padding(
+                key: _precautionsKey,
+                padding: const EdgeInsets.fromLTRB(20, 6, 20, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Health Precautions & Care Tips',
+                      style: AppTypography.headline.copyWith(
+                        fontSize: 17,
+                        color: textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Daily wellness advisories & clinical guidelines',
+                      style: AppTypography.caption.copyWith(color: textSecondary),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildHealthPrecautionCard(
+                      icon: Icons.water_drop_outlined,
+                      title: 'Hydration & Daily Wellness',
+                      description: 'Maintain adequate fluid intake (2-2.5L daily) to support renal filtration and cellular vitality.',
+                      color: AppColors.primary,
+                      surfaceColor: surfaceColor,
+                      borderColor: borderColor,
+                      textPrimary: textPrimary,
+                      textSecondary: textSecondary,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildHealthPrecautionCard(
+                      icon: Icons.medication_liquid_outlined,
+                      title: 'Medication Adherence',
+                      description: 'Always complete prescribed antibiotic courses and consult your doctor before modifying medication dosages.',
+                      color: AppColors.success,
+                      surfaceColor: surfaceColor,
+                      borderColor: borderColor,
+                      textPrimary: textPrimary,
+                      textSecondary: textSecondary,
+                    ),
+                    const SizedBox(height: 10),
+                    _buildHealthPrecautionCard(
+                      icon: Icons.videocam_outlined,
+                      title: 'Telehealth Preparation',
+                      description: 'Ensure a well-lit, quiet environment and test your camera & microphone 5 minutes prior to scheduled video calls.',
+                      color: AppColors.warning,
+                      surfaceColor: surfaceColor,
+                      borderColor: borderColor,
+                      textPrimary: textPrimary,
+                      textSecondary: textSecondary,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+          ],
+
+          // -------------------------------------------------------------
+          // SPECIALIST DIRECTORY SECTION HEADER
+          // -------------------------------------------------------------
           SliverToBoxAdapter(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+              key: _directoryKey,
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Verified Specialists',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: textPrimary,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => context.push('/patient/specialties'),
-                    child: const Text(
-                      'All Specialties',
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.primary,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isSearchMode ? 'Search Results' : 'Specialist Directory',
+                        style: AppTypography.headline.copyWith(
+                          fontSize: 17,
+                          color: textPrimary,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${filteredDoctors.length} Verified Specialist${filteredDoctors.length == 1 ? '' : 's'} Available',
+                        style: AppTypography.caption.copyWith(color: textSecondary),
+                      ),
+                    ],
                   ),
+                  if (isSearchMode)
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _selectedSpecialty = 'All';
+                          _selectedMinRating = null;
+                          _selectedMaxFee = null;
+                          _sortMode = 'rating';
+                        });
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                      ),
+                      child: const Text('Reset Search'),
+                    ),
                 ],
               ),
             ),
           ),
 
-          // 7. Specialist Flat List Rows
+          // -------------------------------------------------------------
+          // VERIFIED SPECIALISTS LIST
+          // -------------------------------------------------------------
           doctorsAsync.when(
-            data: (doctors) {
-              // 1. Filter by verification & specialty
-              final verifiedDoctors = doctors.where((d) => d.isVerified).toList();
-              final specialtyFiltered = verifiedDoctors.where((doc) {
-                return _selectedSpecialty == 'All' ||
-                    doc.specialtyName.toLowerCase() == _selectedSpecialty.toLowerCase();
-              }).toList();
-
-              // 2. Filter by rating & fee
-              final criteriaFiltered = specialtyFiltered.where((doc) {
-                final passesRating =
-                    _selectedMinRating == null || doc.rating >= _selectedMinRating!;
-                final passesFee =
-                    _selectedMaxFee == null || doc.consultationFee <= _selectedMaxFee!;
-                return passesRating && passesFee;
-              }).toList();
-
-              // 3. Apply search query
-              final searched = SmartSearchEngine.filterAndSort<DoctorModel>(
-                items: criteriaFiltered,
-                query: _searchController.text,
-                primaryTextBuilder: (d) => d.doctorName,
-                secondaryTextsBuilder: (d) => [
-                  d.specialtyName,
-                  d.bio,
-                  d.licenseNumber,
-                ],
-              );
-
-              // 4. Apply sorting
-              final filtered = List<DoctorModel>.from(searched);
-              if (_sortMode == 'fee') {
-                filtered.sort((a, b) => a.consultationFee.compareTo(b.consultationFee));
-              } else if (_sortMode == 'exp') {
-                filtered.sort((a, b) => b.experienceYears.compareTo(a.experienceYears));
-              } else {
-                filtered.sort((a, b) => b.rating.compareTo(a.rating));
-              }
-
-              if (filtered.isEmpty) {
-                return SliverToBoxAdapter(
-                  child: Container(
-                    margin: const EdgeInsets.all(20),
-                    padding: const EdgeInsets.all(32),
-                    decoration: BoxDecoration(
-                      color: surfaceColor,
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: borderColor),
-                    ),
-                    child: Column(
-                      children: [
-                        Icon(Icons.person_search_outlined,
-                            size: 44, color: textSecondary.withOpacity(0.5)),
-                        const SizedBox(height: 10),
-                        Text(
-                          'No specialists found',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Try clearing filter brackets or selecting another specialty.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 12, color: textSecondary),
-                        ),
-                      ],
+            data: (_) {
+              if (filteredDoctors.isEmpty) {
+                return SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
+                      child: EmptyStateView(
+                        icon: Icons.search_off_rounded,
+                        title: 'No Specialists Found',
+                        description: 'No medical practitioners match your active filters. Try loosening your search criteria.',
+                        actionLabel: 'Clear Filters',
+                        onAction: () {
+                          setState(() {
+                            _searchController.clear();
+                            _selectedSpecialty = 'All';
+                            _selectedMinRating = null;
+                            _selectedMaxFee = null;
+                            _sortMode = 'rating';
+                          });
+                        },
+                      ),
                     ),
                   ),
                 );
@@ -637,33 +1105,41 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (context, index) {
-                      final doctor = filtered[index];
-                      return Column(
-                        children: [
-                          _FlatPatientDoctorRow(
-                            doctor: doctor,
-                            surfaceColor: surfaceColor,
-                            borderColor: borderColor,
-                            textPrimary: textPrimary,
-                            textSecondary: textSecondary,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) =>
-                                      DoctorDetailsScreen(doctorId: doctor.id),
-                                ),
-                              );
-                            },
-                            onBook: () => context.push('/patient/book/${doctor.id}'),
-                          ),
-                          if (index < filtered.length - 1)
-                            Divider(height: 1, thickness: 1, color: borderColor),
-                        ],
+                    (ctx, index) {
+                      final doc = filteredDoctors[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        decoration: BoxDecoration(
+                          color: surfaceColor,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: borderColor),
+                        ),
+                        child: _FlatPatientDoctorRow(
+                          doctor: doc,
+                          surfaceColor: surfaceColor,
+                          borderColor: borderColor,
+                          textPrimary: textPrimary,
+                          textSecondary: textSecondary,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => DoctorDetailsScreen(doctorId: doc.id),
+                              ),
+                            );
+                          },
+                          onBook: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => BookingScreen(doctorId: doc.id),
+                              ),
+                            );
+                          },
+                        ),
                       );
                     },
-                    childCount: filtered.length,
+                    childCount: filteredDoctors.length,
                   ),
                 ),
               );
@@ -708,13 +1184,17 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
   }
 
   Widget _buildActiveFilterTag(
-      String label, VoidCallback onRemove, Color borderColor, Color textSecondary) {
+    String label,
+    VoidCallback onRemove,
+    Color borderColor,
+    Color textSecondary,
+  ) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.08),
+        color: AppColors.primary.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -730,15 +1210,14 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
           const SizedBox(width: 4),
           InkWell(
             onTap: onRemove,
-            child: const Icon(Icons.close_rounded,
-                size: 13, color: AppColors.primary),
+            child: const Icon(Icons.close_rounded, size: 13, color: AppColors.primary),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildUpcomingConsultationBanner(
+  Widget _buildActionableConsultationRibbon(
     BuildContext context,
     AppointmentModel appointment, {
     required bool isDark,
@@ -747,13 +1226,16 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
     required Color textPrimary,
     required Color textSecondary,
   }) {
+    final isLive = appointment.status == AppointmentStatus.inProgress;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: isDark ? surfaceColor : const Color(0xFFF0F7FF),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isDark ? borderColor : AppColors.primary.withOpacity(0.25),
+          color: isLive ? AppColors.warning : AppColors.primary.withValues(alpha: 0.35),
+          width: isLive ? 1.5 : 1.0,
         ),
       ),
       child: Column(
@@ -761,14 +1243,19 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
           Row(
             children: [
               Container(
-                width: 40,
-                height: 40,
+                width: 42,
+                height: 42,
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withOpacity(0.12),
+                  color: isLive
+                      ? AppColors.warning.withValues(alpha: 0.15)
+                      : AppColors.primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.event_available_rounded,
-                    color: AppColors.primary, size: 22),
+                child: Icon(
+                  isLive ? Icons.sensors_rounded : Icons.event_available_rounded,
+                  color: isLive ? AppColors.warning : AppColors.primary,
+                  size: 22,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -778,32 +1265,32 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.12),
+                            color: isLive
+                                ? AppColors.warning.withValues(alpha: 0.15)
+                                : AppColors.primary.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
-                            'UPCOMING CONSULTATION',
+                          child: Text(
+                            isLive ? '● LIVE CONSULTATION' : 'UPCOMING CONSULTATION',
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w800,
-                              color: AppColors.primary,
+                              color: isLive ? AppColors.warning : AppColors.primary,
                               letterSpacing: 0.5,
                             ),
                           ),
                         ),
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.success.withOpacity(0.12),
+                            color: AppColors.success.withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: const Text(
-                            '● Online',
+                            'Confirmed',
                             style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.w700,
@@ -823,13 +1310,14 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
                       ),
                     ),
                     Text(
-                      DateTimeUtils.formatFullWithTimeZone(
-                          appointment.scheduledTimeUtc),
+                      '${appointment.doctorSpecialty} • ${DateTimeUtils.formatFullWithTimeZone(appointment.scheduledTimeUtc)}',
                       style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w500,
                         color: textSecondary,
                       ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -843,36 +1331,242 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               OutlinedButton.icon(
-                onPressed: () =>
-                    context.push('/consultation/chat/${appointment.id}'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => AppointmentChatScreen(
+                        appointmentId: appointment.id,
+                      ),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.chat_bubble_outline_rounded, size: 14),
                 label: const Text('Chat'),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(70, 32),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
               const SizedBox(width: 8),
               ElevatedButton.icon(
-                onPressed: () =>
-                    context.push('/consultation/room/${appointment.id}'),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => VideoConsultationScreen(
+                        appointmentId: appointment.id,
+                      ),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.videocam_rounded, size: 14),
                 label: const Text('Join Video Call'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  minimumSize: const Size(110, 32),
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                  minimumSize: const Size(120, 32),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHealthPrecautionCard({
+    required IconData icon,
+    required String title,
+    required String description,
+    required Color color,
+    required Color surfaceColor,
+    required Color borderColor,
+    required Color textPrimary,
+    required Color textSecondary,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardMetricTile extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _DashboardMetricTile({
+    required this.title,
+    required this.value,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textSecondary = AppColors.textSecondaryOf(context);
+
+    return Expanded(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceOf(context),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.borderOf(context)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    title,
+                    style: AppTypography.caption.copyWith(
+                      color: textSecondary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Icon(icon, size: 18, color: AppColors.primary),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: AppTypography.display.copyWith(
+                  fontSize: 22,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final surfaceColor = AppColors.surfaceOf(context);
+    final borderColor = AppColors.borderOf(context);
+    final textPrimary = AppColors.textPrimaryOf(context);
+
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: AppColors.primary, size: 18),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10.5,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -901,14 +1595,14 @@ class _FlatPatientDoctorRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      child: Container(
-        color: surfaceColor,
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             CircleAvatar(
-              radius: 26,
+              radius: 24,
               backgroundColor: AppColors.primaryLight,
               backgroundImage: doctor.avatarUrl != null
                   ? NetworkImage(doctor.avatarUrl!)
@@ -919,14 +1613,14 @@ class _FlatPatientDoctorRow extends StatelessWidget {
                           ? doctor.doctorName[0].toUpperCase()
                           : 'D',
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,
                       ),
                     )
                   : null,
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -937,7 +1631,7 @@ class _FlatPatientDoctorRow extends StatelessWidget {
                         child: Text(
                           doctor.doctorName,
                           style: TextStyle(
-                            fontSize: 14.5,
+                            fontSize: 14,
                             fontWeight: FontWeight.w700,
                             color: textPrimary,
                           ),
@@ -946,83 +1640,68 @@ class _FlatPatientDoctorRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.verified,
-                          size: 14, color: AppColors.primary),
+                      const Icon(Icons.verified, size: 14, color: AppColors.primary),
                     ],
                   ),
                   const SizedBox(height: 2),
                   Text(
                     doctor.specialtyName,
                     style: const TextStyle(
-                      fontSize: 12.5,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${doctor.experienceYears}y experience',
+                    '${doctor.experienceYears}y exp • \$${doctor.consultationFee.toStringAsFixed(0)} fee',
                     style: TextStyle(
-                      fontSize: 11.5,
+                      fontSize: 11,
                       fontWeight: FontWeight.w400,
                       color: textSecondary,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Row(
                     children: [
-                      const Icon(Icons.star_rounded,
-                          size: 15, color: Color(0xFFF59E0B)),
-                      const SizedBox(width: 3),
+                      const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF59E0B)),
+                      const SizedBox(width: 2),
                       Text(
                         doctor.rating.toStringAsFixed(1),
                         style: TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
                           color: textPrimary,
                         ),
                       ),
                       Text(
                         ' (${doctor.reviewCount})',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: textSecondary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Text(
-                        '\$${doctor.consultationFee.toStringAsFixed(0)}',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                          color: textPrimary,
-                        ),
+                        style: TextStyle(fontSize: 10.5, color: textSecondary),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             ElevatedButton(
               onPressed: onBook,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
               child: const Text(
                 'Book',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
               ),
             ),
           ],
