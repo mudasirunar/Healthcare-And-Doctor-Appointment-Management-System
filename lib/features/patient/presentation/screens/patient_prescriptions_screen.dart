@@ -237,15 +237,6 @@ class _PatientPrescriptionsScreenState
           backgroundColor: surfaceColor,
           elevation: 0,
           scrolledUnderElevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            color: textPrimary,
-            onPressed: () {
-              if (Navigator.canPop(context)) {
-                Navigator.pop(context);
-              }
-            },
-          ),
           title: Text(
             'Digital Prescriptions',
             style: TextStyle(
