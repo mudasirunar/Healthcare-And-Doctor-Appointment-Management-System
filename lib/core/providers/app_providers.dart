@@ -103,6 +103,7 @@ Future<void> appSignOut(WidgetRef ref) async {
   ref.invalidate(allPrescriptionsAdminProvider);
   ref.invalidate(pendingDoctorsProvider);
   ref.invalidate(userAppointmentsProvider);
+  ref.invalidate(verifiedDoctorsStreamProvider);
 }
 
 
@@ -250,10 +251,16 @@ final userAppointmentsProvider = FutureProvider<List<AppointmentModel>>((ref) as
 });
 
 final verifiedDoctorsStreamProvider = StreamProvider<List<DoctorModel>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return Stream.value(<DoctorModel>[]);
+
   return FirebaseFirestore.instance
       .collection('doctors')
       .where('verificationStatus', isEqualTo: 'approved')
       .snapshots()
+      .handleError((e) {
+        debugPrint('verifiedDoctorsStreamProvider error: $e');
+      })
       .map((s) => s.docs.map((d) => DoctorModel.fromMap(d.data(), id: d.id)).toList());
 });
 

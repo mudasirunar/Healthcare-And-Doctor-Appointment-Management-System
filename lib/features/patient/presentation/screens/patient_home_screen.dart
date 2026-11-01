@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
 import '../../../../core/utils/smart_search_utils.dart';
 import '../../../../core/widgets/app_search_bar.dart';
@@ -676,8 +677,22 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
             error: (err, _) => SliverToBoxAdapter(
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Text('Error loading specialists: $err'),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                  child: Column(
+                    children: [
+                      Text(
+                        'Unable to load specialists: $err',
+                        textAlign: TextAlign.center,
+                        style: AppTypography.bodyMedium.copyWith(color: textSecondary),
+                      ),
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        onPressed: () => ref.invalidate(verifiedDoctorsStreamProvider),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

@@ -21,6 +21,9 @@ class EmptyStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textSecondary = AppColors.textSecondaryOf(context);
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
@@ -30,7 +33,7 @@ class EmptyStateView extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.primaryLight.withOpacity(0.5),
+                color: AppColors.primary.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 48, color: AppColors.primary),
@@ -39,13 +42,13 @@ class EmptyStateView extends StatelessWidget {
             Text(
               title,
               textAlign: TextAlign.center,
-              style: AppTypography.headline,
+              style: AppTypography.headline.copyWith(color: textPrimary),
             ),
             const SizedBox(height: 8),
             Text(
               description,
               textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+              style: AppTypography.bodyMedium.copyWith(color: textSecondary),
             ),
             if (actionLabel != null && onAction != null) ...[
               const SizedBox(height: 24),
@@ -77,6 +80,9 @@ class ErrorStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textSecondary = AppColors.textSecondaryOf(context);
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
@@ -85,23 +91,23 @@ class ErrorStateView extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(18),
-              decoration: const BoxDecoration(
-                color: AppColors.errorLight,
+              decoration: BoxDecoration(
+                color: AppColors.error.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.error_outline_rounded, size: 44, color: AppColors.error),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Something Went Wrong',
               textAlign: TextAlign.center,
-              style: AppTypography.headline,
+              style: AppTypography.headline.copyWith(color: textPrimary),
             ),
             const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary),
+              style: AppTypography.bodyMedium.copyWith(color: textSecondary),
             ),
             if (onRetry != null) ...[
               const SizedBox(height: 20),
