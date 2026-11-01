@@ -7,7 +7,9 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/date_time_utils.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
+import '../../../auth/domain/entities/user_model.dart';
 import '../../../patient/presentation/screens/doctor_details_screen.dart';
+import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
 import '../../domain/entities/chat_message_model.dart';
 import 'prescription_builder_dialog.dart';
 import 'prescription_viewer_screen.dart';
@@ -232,7 +234,7 @@ class _UnifiedChatScreenState extends ConsumerState<UnifiedChatScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         titleSpacing: 0,
-        // Clickable header: Patients tap to view DoctorDetailsScreen
+        // Clickable header: Patients tap to view DoctorDetailsScreen; Doctors tap to view UnifiedPatientDetailScreen
         title: InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () {
@@ -241,6 +243,16 @@ class _UnifiedChatScreenState extends ConsumerState<UnifiedChatScreen> {
                 context,
                 MaterialPageRoute(
                   builder: (_) => DoctorDetailsScreen(doctorId: apt.doctorId),
+                ),
+              );
+            } else if (!isPatient && apt != null && apt.patientId.isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => UnifiedPatientDetailScreen(
+                    patientId: apt.patientId,
+                    role: UserRole.doctor,
+                  ),
                 ),
               );
             }
