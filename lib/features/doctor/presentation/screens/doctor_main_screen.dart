@@ -1,13 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:healthcare_app/core/providers/app_providers.dart';
-import 'package:healthcare_app/core/theme/app_colors.dart';
-import 'package:healthcare_app/core/theme/app_typography.dart';
-import 'package:healthcare_app/features/doctor/domain/entities/doctor_model.dart';
-import 'doctor_agenda_screen.dart';
+import '../../../../core/providers/app_providers.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../../../../core/widgets/app_bottom_nav_bar.dart';
+import '../../../../core/widgets/app_dialog.dart';
+import '../../../appointment/domain/entities/appointment_model.dart';
+import '../../domain/entities/doctor_model.dart';
+import 'doctor_dashboard_screen.dart';
 import 'doctor_requests_screen.dart';
 import 'doctor_availability_screen.dart';
+import 'doctor_settings_screen.dart';
+import 'doctor_notifications_screen.dart';
 
 class DoctorMainScreen extends ConsumerStatefulWidget {
   const DoctorMainScreen({super.key});
@@ -17,20 +22,88 @@ class DoctorMainScreen extends ConsumerStatefulWidget {
 }
 
 class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
-  final List<Widget> _pages = const [
-    DoctorAgendaScreen(),
-    DoctorRequestsScreen(),
-    DoctorAvailabilityScreen(),
-    _DoctorProfileTab(),
-  ];
+  final ScrollController _dashboardScrollController = ScrollController();
+  final ScrollController _requestsScrollController = ScrollController();
+  final ScrollController _availabilityScrollController = ScrollController();
+  final ScrollController _settingsScrollController = ScrollController();
+
+  late final List<ScrollController> _scrollControllers;
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollControllers = [
+      _dashboardScrollController,
+      _requestsScrollController,
+      _availabilityScrollController,
+      _settingsScrollController,
+    ];
+    _pages = [
+      DoctorDashboardScreen(scrollController: _dashboardScrollController),
+      DoctorRequestsScreen(scrollController: _requestsScrollController),
+      DoctorAvailabilityScreen(scrollController: _availabilityScrollController),
+      DoctorSettingsScreen(
+        scrollController: _settingsScrollController,
+        onSignOut: _handleSignOut,
+      ),
+    ];
+  }
+
+  @override
+  void dispose() {
+    _dashboardScrollController.dispose();
+    _requestsScrollController.dispose();
+    _availabilityScrollController.dispose();
+    _settingsScrollController.dispose();
+    super.dispose();
+  }
+
+  void _handleSignOut() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AppDialog(
+        icon: Icons.logout_rounded,
+        tone: AppDialogTone.destructive,
+        title: 'Sign Out',
+        message: 'Are you sure you want to sign out of your physician workspace?',
+        cancelLabel: 'Cancel',
+        confirmLabel: 'Sign Out',
+        confirmIsDestructive: true,
+        onConfirm: () async {
+          Navigator.pop(ctx);
+          await appSignOut(ref);
+          if (mounted) {
+            context.go('/');
+          }
+        },
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final doctorRepo = ref.watch(doctorRepositoryProvider);
     final currentIndex = ref.watch(doctorSelectedTabProvider);
+    final appointmentsAsync = ref.watch(userAppointmentsProvider);
+    final unreadNotifs = ref.watch(unreadPatientNotificationsCountProvider);
+    final unreadChats = ref.watch(unreadConversationsCountProvider);
+
+    final pendingRequestsCount = appointmentsAsync.value
+            ?.where((a) => a.status == AppointmentStatus.requested)
+            .length ??
+        0;
 
     return Scaffold(
+      backgroundColor: AppColors.backgroundOf(context),
+      extendBody: true,
+      appBar: _buildContextualAppBar(
+        context,
+        tabIndex: currentIndex,
+        unreadNotificationsCount: unreadNotifs,
+        unreadChatsCount: unreadChats,
+      ),
       body: Column(
         children: [
           // Verification Warning Banner if Doctor is pending or rejected
@@ -43,18 +116,21 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
               if (doc.verificationStatus == VerificationStatus.pending) {
                 return Container(
                   width: double.infinity,
-                  color: AppColors.warningLight,
+                  color: AppColors.warningLight.withValues(alpha: 0.8),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: SafeArea(
                     bottom: false,
                     child: Row(
                       children: [
                         const Icon(Icons.pending_actions_rounded, size: 18, color: AppColors.warning),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Your profile is pending administrator verification. Patients cannot discover your slots until approved.',
-                            style: AppTypography.caption.copyWith(color: AppColors.warning),
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -64,18 +140,21 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
               } else if (doc.verificationStatus == VerificationStatus.rejected) {
                 return Container(
                   width: double.infinity,
-                  color: AppColors.errorLight,
+                  color: AppColors.errorLight.withValues(alpha: 0.8),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: SafeArea(
                     bottom: false,
                     child: Row(
                       children: [
                         const Icon(Icons.cancel_outlined, size: 18, color: AppColors.error),
-                        const SizedBox(width: 8),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             'Verification declined: ${doc.verificationNotes ?? "Credentials could not be verified."}',
-                            style: AppTypography.caption.copyWith(color: AppColors.error),
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.error,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
                       ],
@@ -94,133 +173,361 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (idx) =>
-            ref.read(doctorSelectedTabProvider.notifier).state = idx,
-        indicatorColor: AppColors.primaryLight,
-        backgroundColor: AppColors.surface,
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.event_note_outlined),
-            selectedIcon: Icon(Icons.event_note_rounded, color: AppColors.primary),
-            label: 'Agenda',
+      bottomNavigationBar: AppBottomNavBar(
+        currentIndex: currentIndex,
+        onTap: (idx) => ref.read(doctorSelectedTabProvider.notifier).state = idx,
+        scrollControllers: _scrollControllers,
+        items: [
+          const AppNavItem(
+            icon: Icons.dashboard_outlined,
+            activeIcon: Icons.dashboard_rounded,
+            label: 'Dashboard',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.mark_email_unread_outlined),
-            selectedIcon: Icon(Icons.mark_email_unread_rounded, color: AppColors.primary),
+          AppNavItem(
+            icon: Icons.mark_email_unread_outlined,
+            activeIcon: Icons.mark_email_unread_rounded,
             label: 'Requests',
+            badgeCount: pendingRequestsCount,
           ),
-          NavigationDestination(
-            icon: Icon(Icons.schedule_outlined),
-            selectedIcon: Icon(Icons.schedule_rounded, color: AppColors.primary),
+          const AppNavItem(
+            icon: Icons.schedule_outlined,
+            activeIcon: Icons.schedule_rounded,
             label: 'Availability',
           ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded, color: AppColors.primary),
-            label: 'Profile',
+          const AppNavItem(
+            icon: Icons.settings_outlined,
+            activeIcon: Icons.settings_rounded,
+            label: 'Settings',
           ),
         ],
       ),
     );
   }
-}
 
-class _DoctorProfileTab extends ConsumerWidget {
-  const _DoctorProfileTab();
+  PreferredSizeWidget _buildContextualAppBar(
+    BuildContext context, {
+    required int tabIndex,
+    required int unreadNotificationsCount,
+    required int unreadChatsCount,
+  }) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+    final textSecondary = AppColors.textSecondaryOf(context);
+    final surfaceColor = AppColors.surfaceOf(context);
+    final borderColor = AppColors.borderOf(context);
+    final currentUser = ref.watch(currentUserProvider);
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider);
-    final doctorRepo = ref.watch(doctorRepositoryProvider);
+    final chatButton = _ChatIconButtonWithBadge(
+      unreadCount: unreadChatsCount,
+      onTap: () => context.push('/doctor/chats'),
+    );
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Doctor Workspace Profile'),
-      ),
-      body: FutureBuilder<DoctorModel?>(
-        future: user != null ? doctorRepo.getDoctorByUserId(user.id) : null,
-        builder: (context, snapshot) {
-          final doc = snapshot.data;
+    final notificationBell = _NotificationBellButton(
+      unreadCount: unreadNotificationsCount,
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const DoctorNotificationsScreen(),
+          ),
+        );
+      },
+    );
 
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: AppColors.primaryLight,
-                  child: Text(
-                    doc?.doctorName.isNotEmpty == true ? doc!.doctorName[0] : 'D',
-                    style: AppTypography.display.copyWith(color: AppColors.primary, fontSize: 32),
-                  ),
+    final (Widget leadingContent, Widget? trailingContent) = switch (tabIndex) {
+      0 => (
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.primaryLight,
+                backgroundImage: currentUser?.avatarUrl != null
+                    ? NetworkImage(currentUser!.avatarUrl!)
+                    : null,
+                child: currentUser?.avatarUrl == null
+                    ? Text(
+                        currentUser != null && currentUser.displayName.isNotEmpty
+                            ? currentUser.displayName[0].toUpperCase()
+                            : 'D',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Physician Workspace',
+                      style: AppTypography.caption.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      currentUser?.displayName ?? 'Doctor',
+                      style: AppTypography.headline.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: textPrimary,
+                        letterSpacing: 0,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
-                Text(doc?.doctorName ?? user?.displayName ?? 'Doctor', style: AppTypography.headline),
-                Text(doc?.specialtyName ?? 'Specialist', style: AppTypography.subtitle.copyWith(color: AppColors.primary)),
-                const SizedBox(height: 20),
-
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    children: [
-                      _ProfileRow(label: 'Verification Status', value: doc?.verificationStatus.displayName ?? 'Pending'),
-                      const Divider(height: 16, color: AppColors.border),
-                      _ProfileRow(label: 'Medical License', value: doc?.licenseNumber ?? 'N/A'),
-                      const Divider(height: 16, color: AppColors.border),
-                      _ProfileRow(label: 'Clinical Experience', value: '${doc?.experienceYears ?? 0} Years'),
-                      const Divider(height: 16, color: AppColors.border),
-                      _ProfileRow(label: 'Consultation Fee', value: '\$${doc?.consultationFee.toStringAsFixed(0) ?? "0"}'),
-                      const Divider(height: 16, color: AppColors.border),
-                      _ProfileRow(label: 'Email', value: user?.email ?? ''),
-                    ],
-                  ),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              chatButton,
+              const SizedBox(width: 8),
+              notificationBell,
+            ],
+          ),
+        ),
+      1 => (
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Booking Requests',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 18,
+                  color: textPrimary,
                 ),
-                const SizedBox(height: 32),
-
-                OutlinedButton.icon(
-                  onPressed: () async {
-                    await appSignOut(ref);
-                    if (context.mounted) {
-                      context.go('/');
-                    }
-                  },
-                  icon: const Icon(Icons.logout_rounded, color: AppColors.error),
-                  label: const Text('Sign Out', style: TextStyle(color: AppColors.error)),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.error),
-                  ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Patient consult requests awaiting review',
+                style: AppTypography.caption.copyWith(
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
                 ),
-              ],
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              chatButton,
+              const SizedBox(width: 8),
+              notificationBell,
+            ],
+          ),
+        ),
+      2 => (
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Practice Availability',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 18,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Working shifts, slot durations & blackout dates',
+                style: AppTypography.caption.copyWith(
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          null,
+        ),
+      _ => (
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Doctor Settings',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 18,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Workspace preferences, security & profile',
+                style: AppTypography.caption.copyWith(
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          null,
+        ),
+    };
+
+    return PreferredSize(
+      preferredSize: const Size.fromHeight(68),
+      child: RepaintBoundary(
+        child: Container(
+          decoration: BoxDecoration(
+            color: surfaceColor,
+            border: Border(bottom: BorderSide(color: borderColor, width: 1)),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Row(
+                children: [
+                  Expanded(child: leadingContent),
+                  ?trailingContent,
+                ],
+              ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
 }
 
-class _ProfileRow extends StatelessWidget {
-  final String label;
-  final String value;
+class _ChatIconButtonWithBadge extends StatelessWidget {
+  final int unreadCount;
+  final VoidCallback onTap;
 
-  const _ProfileRow({required this.label, required this.value});
+  const _ChatIconButtonWithBadge({
+    required this.unreadCount,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: AppTypography.bodyMedium.copyWith(color: AppColors.textSecondary)),
-        Text(value, style: AppTypography.bodyMedium.copyWith(fontWeight: FontWeight.w600)),
-      ],
+    final textPrimary = AppColors.textPrimaryOf(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariantOf(context),
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.borderOf(context)),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              unreadCount > 0
+                  ? Icons.chat_bubble_rounded
+                  : Icons.chat_bubble_outline_rounded,
+              size: 20,
+              color: unreadCount > 0 ? AppColors.primary : textPrimary,
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                right: -6,
+                top: -6,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(
+                      color: AppColors.surfaceOf(context),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      unreadCount > 9 ? '9+' : '$unreadCount',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationBellButton extends StatelessWidget {
+  final int unreadCount;
+  final VoidCallback onTap;
+
+  const _NotificationBellButton({
+    required this.unreadCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final textPrimary = AppColors.textPrimaryOf(context);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 42,
+        height: 42,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: AppColors.surfaceVariantOf(context),
+          shape: BoxShape.circle,
+          border: Border.all(color: AppColors.borderOf(context)),
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Icon(
+              unreadCount > 0
+                  ? Icons.notifications_rounded
+                  : Icons.notifications_none_rounded,
+              size: 22,
+              color: unreadCount > 0 ? AppColors.primary : textPrimary,
+            ),
+            if (unreadCount > 0)
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.surfaceOf(context),
+                      width: 1.5,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

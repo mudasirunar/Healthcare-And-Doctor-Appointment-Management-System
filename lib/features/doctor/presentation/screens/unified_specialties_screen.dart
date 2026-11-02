@@ -16,6 +16,7 @@ import '../../../patient/presentation/screens/patient_specialty_doctors_screen.d
 enum SpecialtyScreenRole {
   admin,
   patient,
+  doctor,
 }
 
 /// Green-tinted "+ Add" button for Medical Specialties.
@@ -442,6 +443,16 @@ class _UnifiedSpecialtiesScreenState
                           MaterialPageRoute(
                             builder: (_) => AdminSpecialtyDoctorsScreen(
                               specialty: spec,
+                            ),
+                          ),
+                        );
+                      } else if (widget.role == SpecialtyScreenRole.doctor) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => UnifiedSpecialtyDoctorsScreen(
+                              specialty: spec,
+                              role: SpecialtyScreenRole.doctor,
                             ),
                           ),
                         );

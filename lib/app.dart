@@ -27,6 +27,21 @@ class _HealthcareAppState extends ConsumerState<HealthcareApp> {
         appRouter.push('/patient/notifications');
       }
     };
+
+    // Initialize presence immediately if user already signed in
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final user = ref.read(currentUserProvider);
+      if (user != null && !user.isAdmin) {
+        String? doctorId;
+        if (user.isDoctor) {
+          final doc = await ref
+              .read(doctorRepositoryProvider)
+              .getDoctorByUserId(user.id);
+          doctorId = doc?.id;
+        }
+        PresenceService.instance.initialize(user.id, doctorId: doctorId);
+      }
+    });
   }
 
   @override
@@ -34,7 +49,7 @@ class _HealthcareAppState extends ConsumerState<HealthcareApp> {
     final themeMode = ref.watch(themeModeProvider);
 
     // Automatically manage real-time notification listener and presence ONLY when user changes
-    ref.listen<UserModel?>(currentUserProvider, (previous, next) {
+    ref.listen<UserModel?>(currentUserProvider, (previous, next) async {
       if (next != null) {
         if (previous?.id != next.id) {
           NotificationService.instance.startListeningForUser(
@@ -42,7 +57,14 @@ class _HealthcareAppState extends ConsumerState<HealthcareApp> {
             isAdmin: next.isAdmin,
           );
           if (!next.isAdmin) {
-            PresenceService.instance.initialize(next.id);
+            String? doctorId;
+            if (next.isDoctor) {
+              final doc = await ref
+                  .read(doctorRepositoryProvider)
+                  .getDoctorByUserId(next.id);
+              doctorId = doc?.id;
+            }
+            PresenceService.instance.initialize(next.id, doctorId: doctorId);
           }
         }
       } else if (previous != null) {

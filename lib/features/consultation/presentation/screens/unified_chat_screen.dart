@@ -63,6 +63,20 @@ class _UnifiedChatScreenState extends ConsumerState<UnifiedChatScreen> {
   final Set<String> _animatingMessageIds = {};
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(currentUserProvider);
+      if (user != null) {
+        ref.read(appointmentRepositoryProvider).markAppointmentMessagesAsRead(
+              appointmentId: widget.appointmentId,
+              readerRole: user.role.name,
+            );
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
@@ -185,14 +199,17 @@ class _UnifiedChatScreenState extends ConsumerState<UnifiedChatScreen> {
         ref.watch(appointmentMessagesStreamProvider(effectiveChatId));
 
     // Automatically mark unread messages as read upon viewing
-    ref.listen(appointmentMessagesStreamProvider(effectiveChatId), (_, next) {
-      if (user != null) {
-        ref.read(appointmentRepositoryProvider).markAppointmentMessagesAsRead(
-              appointmentId: effectiveChatId,
-              readerRole: user.role.name,
-            );
-      }
-    });
+    ref.listen(
+      appointmentMessagesStreamProvider(effectiveChatId),
+      (_, next) {
+        if (user != null && next.hasValue) {
+          ref.read(appointmentRepositoryProvider).markAppointmentMessagesAsRead(
+                appointmentId: effectiveChatId,
+                readerRole: user.role.name,
+              );
+        }
+      },
+    );
 
     final participantName = isPatient
         ? (apt?.doctorName.isNotEmpty == true ? apt!.doctorName : 'Specialist')
@@ -259,36 +276,88 @@ class _UnifiedChatScreenState extends ConsumerState<UnifiedChatScreen> {
           },
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        participantName,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: textPrimary,
+            child: isPatient
+                ? Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              participantName,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: textPrimary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Presence status dot only
+                          Container(
+                            width: 8.5,
+                            height: 8.5,
+                            decoration: BoxDecoration(
+                              color: isOnline
+                                  ? AppColors.success
+                                  : const Color(0xFF9E9E9E),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                            color: textSecondary.withOpacity(0.6),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 1),
+                      // Specialist title (e.g. Cardiologist)
+                      Text(
+                        subtitleText,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Presence status dot only
-                    Container(
-                      width: 8.5,
-                      height: 8.5,
-                      decoration: BoxDecoration(
-                        color: isOnline ? AppColors.success : const Color(0xFF9E9E9E),
-                        shape: BoxShape.circle,
+                    ],
+                  )
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Flexible(
+                        child: Text(
+                          participantName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: textPrimary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                    ),
-                    if (isPatient) ...[
+                      const SizedBox(width: 8),
+                      // Presence status dot only
+                      Container(
+                        width: 8.5,
+                        height: 8.5,
+                        decoration: BoxDecoration(
+                          color: isOnline
+                              ? AppColors.success
+                              : const Color(0xFF9E9E9E),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
                       const SizedBox(width: 2),
                       Icon(
                         Icons.chevron_right_rounded,
@@ -296,22 +365,7 @@ class _UnifiedChatScreenState extends ConsumerState<UnifiedChatScreen> {
                         color: textSecondary.withOpacity(0.6),
                       ),
                     ],
-                  ],
-                ),
-                const SizedBox(height: 1),
-                // Specialist title (e.g. Cardiologist)
-                Text(
-                  subtitleText,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isPatient ? AppColors.primary : textSecondary,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
           ),
         ),
         actions: [

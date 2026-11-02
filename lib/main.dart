@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'app.dart';
@@ -11,6 +10,10 @@ import 'core/services/preferences_service.dart';
 /// Set to true for local testing with zero quota and instant responses.
 /// Set to false before building the production release APK.
 const bool kUseLocalFirestore = true;
+
+/// Current Wi-Fi IP of this Mac running the Firestore emulator.
+/// Allows physical iPhones and Android phones on the same Wi-Fi network to connect.
+const String kMacLocalIp = '10.238.43.141';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,8 +27,8 @@ void main() async {
 
     // Route Firestore to local emulator if enabled
     if (kUseLocalFirestore) {
-      // 192.168.1.106 allows physical iOS/Android phones and simulators on the same Wi-Fi to connect to Mac's emulator
-      final host = defaultTargetPlatform == TargetPlatform.android ? '10.0.2.2' : '192.168.1.106';
+      // Connect to Mac's emulator (works across iOS Simulator, Android Emulator, and physical Wi-Fi devices)
+      final host = kMacLocalIp;
       FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
       FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
       debugPrint('⚡ Connected FirebaseFirestore to Local Emulator at $host:8080');

@@ -15,6 +15,7 @@ import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../auth/domain/entities/user_model.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
+import 'doctor_edit_profile_screen.dart';
 import '../../../patient/presentation/screens/booking_screen.dart';
 import '../../../patient/presentation/screens/patient_appointment_detail_screen.dart';
 
@@ -226,10 +227,12 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentUser = ref.watch(currentUserProvider);
     final effectiveRole =
-        role ?? ref.watch(currentUserProvider)?.role ?? UserRole.patient;
+        role ?? currentUser?.role ?? UserRole.patient;
     final isAdmin = effectiveRole == UserRole.admin;
     final isPatient = effectiveRole == UserRole.patient;
+    final isDoctor = effectiveRole == UserRole.doctor;
 
     final surfaceColor = AppColors.surfaceOf(context);
     final borderColor = AppColors.borderOf(context);
@@ -280,6 +283,9 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
           );
         }
 
+        // Check if self doctor comparing userId
+        final isSelf = isDoctor && currentUser != null && (currentUser.id == doctor.userId || currentUser.id == doctor.id);
+
         // Appointments and Prescriptions resolution
         final List<AppointmentModel> doctorAppointments;
         final List<dynamic> doctorPrescriptions;
@@ -293,6 +299,20 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
               allApts.where((a) => a.doctorId == doctor.id).toList();
           doctorPrescriptions =
               allRx.where((r) => r.doctorId == doctor.id).toList();
+        } else if (isDoctor) {
+          if (isSelf) {
+            final appointmentsAsync = ref.watch(userAppointmentsProvider);
+            final appointments = appointmentsAsync.valueOrNull ?? [];
+            doctorAppointments = appointments
+                .where((a) => a.doctorId == doctor.id || a.doctorId == doctorId)
+                .toList()
+              ..sort((a, b) => b.scheduledTimeUtc.compareTo(a.scheduledTimeUtc));
+            doctorPrescriptions = [];
+          } else {
+            // Colleague doctor: Cannot view colleague's private patient records
+            doctorAppointments = [];
+            doctorPrescriptions = [];
+          }
         } else {
           final appointmentsAsync = ref.watch(userAppointmentsProvider);
           final appointments = appointmentsAsync.valueOrNull ?? [];
@@ -319,7 +339,7 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
         return Scaffold(
           backgroundColor: AppColors.backgroundOf(context),
           appBar: AppBar(
-            title: const Text('Specialist Profile'),
+            title: Text(isSelf ? 'My Professional Profile' : 'Specialist Profile'),
             backgroundColor: surfaceColor,
             elevation: 0,
             scrolledUnderElevation: 0,
@@ -330,81 +350,89 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
                         Divider(height: 1, thickness: 1, color: borderColor),
                   )
                 : null,
-            actions: isAdmin
-                ? [
-                    IconButton(
-                      icon: const Icon(Icons.edit_outlined),
-                      tooltip: 'Edit Specialist',
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                AdminEditDoctorScreen(doctor: doctor),
-                          ),
-                        );
-                      },
+            actions: [
+              if (isAdmin) ...[
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Edit Specialist',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            AdminEditDoctorScreen(doctor: doctor),
+                      ),
+                    );
+                  },
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert_rounded),
+                  onSelected: (action) {
+                    if (action == 'edit') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              AdminEditDoctorScreen(doctor: doctor),
+                        ),
+                      );
+                    } else if (action == 'reassign') {
+                      _showQuickReassignSpecialtyDialog(
+                          context, ref, doctor);
+                    } else if (action == 'delete') {
+                      _confirmDeleteDoctor(context, ref, doctor);
+                    }
+                  },
+                  itemBuilder: (ctx) => [
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit_outlined, size: 18),
+                          SizedBox(width: 10),
+                          Text('Edit Profile'),
+                        ],
+                      ),
                     ),
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_vert_rounded),
-                      onSelected: (action) {
-                        if (action == 'edit') {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  AdminEditDoctorScreen(doctor: doctor),
-                            ),
-                          );
-                        } else if (action == 'reassign') {
-                          _showQuickReassignSpecialtyDialog(
-                              context, ref, doctor);
-                        } else if (action == 'delete') {
-                          _confirmDeleteDoctor(context, ref, doctor);
-                        }
-                      },
-                      itemBuilder: (ctx) => [
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit_outlined, size: 18),
-                              SizedBox(width: 10),
-                              Text('Edit Profile'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'reassign',
-                          child: Row(
-                            children: [
-                              Icon(Icons.swap_horiz_rounded, size: 18),
-                              SizedBox(width: 10),
-                              Text('Change Department'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.delete_outline_rounded,
-                                size: 18,
-                                color: AppColors.error,
-                              ),
-                              SizedBox(width: 10),
-                              Text(
-                                'Remove from Registry',
-                                style: TextStyle(color: AppColors.error),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    const PopupMenuItem(
+                      value: 'reassign',
+                      child: Row(
+                        children: [
+                          Icon(Icons.swap_horiz_rounded, size: 18),
+                          SizedBox(width: 10),
+                          Text('Reassign Specialty'),
+                        ],
+                      ),
                     ),
-                  ]
-                : null,
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete_outline_rounded,
+                              size: 18, color: AppColors.error),
+                          SizedBox(width: 10),
+                          Text('Remove Doctor',
+                              style: TextStyle(color: AppColors.error)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ] else if (isSelf) ...[
+                IconButton(
+                  icon: const Icon(Icons.edit_outlined),
+                  tooltip: 'Edit Profile',
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => DoctorEditProfileScreen(doctor: doctor),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ],
           ),
           body: Column(
             children: [

@@ -158,17 +158,18 @@ final unreadConversationsCountProvider = Provider<int>((ref) {
   return 0;
 });
 
-/// Streams real-time online/offline presence for any user by userId.
+/// Streams real-time online/offline presence for any user by userId or doctorId.
 final userPresenceStreamProvider =
-    StreamProvider.family<bool, String>((ref, userId) {
-  if (userId.isEmpty) return Stream.value(false);
+    StreamProvider.family<bool, String>((ref, id) {
+  if (id.isEmpty) return Stream.value(false);
+  final collectionName = id.startsWith('doc_') ? 'doctors' : 'users';
   return FirebaseFirestore.instance
-      .collection('users')
-      .doc(userId)
+      .collection(collectionName)
+      .doc(id)
       .snapshots()
       .map((snap) {
         final online = snap.data()?['isOnline'] as bool? ?? false;
-        PresenceService.instance.updateUserPresenceLocally(userId, online);
+        PresenceService.instance.updateUserPresenceLocally(id, online);
         return online;
       })
       .handleError((e) {

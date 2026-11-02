@@ -12,6 +12,7 @@ import '../../features/consultation/presentation/screens/patient_chats_hub_scree
 import '../../features/consultation/presentation/screens/doctor_chats_hub_screen.dart';
 import '../../features/doctor/presentation/screens/doctor_main_screen.dart';
 import '../../features/doctor/presentation/screens/doctor_availability_screen.dart';
+import '../../features/doctor/presentation/screens/doctor_notifications_screen.dart';
 import '../../features/admin/presentation/screens/admin_dashboard_screen.dart';
 import '../../features/admin/presentation/screens/admin_notifications_screen.dart';
 import '../../features/admin/presentation/screens/admin_doctor_detail_screen.dart';
@@ -91,6 +92,14 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/doctor/chats',
       builder: (context, state) => const DoctorChatsHubScreen(),
+    ),
+    GoRoute(
+      path: '/doctor/notifications',
+      builder: (context, state) => const DoctorNotificationsScreen(),
+    ),
+    GoRoute(
+      path: '/doctor/specialties',
+      builder: (context, state) => const UnifiedSpecialtiesScreen(role: SpecialtyScreenRole.doctor),
     ),
     GoRoute(
       path: '/admin',

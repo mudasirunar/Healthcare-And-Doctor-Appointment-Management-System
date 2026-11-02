@@ -24,15 +24,43 @@ class FirebaseAuthRepository implements AuthRepository {
 
     final docSnapshot = await _firestore.collection('users').doc(currentFirebaseUser.uid).get();
     if (docSnapshot.exists && docSnapshot.data() != null) {
-      return UserModel.fromMap(docSnapshot.data()!, id: docSnapshot.id);
+      final user = UserModel.fromMap(docSnapshot.data()!, id: docSnapshot.id);
+      if (user.role == UserRole.patient) {
+        final docQuery = await _firestore
+            .collection('doctors')
+            .where('userId', isEqualTo: currentFirebaseUser.uid)
+            .limit(1)
+            .get();
+        if (docQuery.docs.isNotEmpty) {
+          await _firestore
+              .collection('users')
+              .doc(currentFirebaseUser.uid)
+              .update({'role': 'doctor'});
+          return user.copyWith(role: UserRole.doctor);
+        }
+      }
+      return user;
     }
+
+    // Check if registered as doctor or admin
+    final docQuery = await _firestore
+        .collection('doctors')
+        .where('userId', isEqualTo: currentFirebaseUser.uid)
+        .limit(1)
+        .get();
+    final isDoc = docQuery.docs.isNotEmpty;
+    final fallbackRole = isDoc
+        ? UserRole.doctor
+        : ((currentFirebaseUser.email?.contains('admin') ?? false)
+            ? UserRole.admin
+            : UserRole.patient);
 
     // Fallback if firestore document hasn't synced yet
     return UserModel(
       id: currentFirebaseUser.uid,
       email: currentFirebaseUser.email ?? '',
       displayName: currentFirebaseUser.displayName ?? 'User',
-      role: UserRole.patient,
+      role: fallbackRole,
       createdAt: DateTime.now().toUtc().toIso8601String(),
       updatedAt: DateTime.now().toUtc().toIso8601String(),
     );
@@ -77,16 +105,42 @@ class FirebaseAuthRepository implements AuthRepository {
 
       final doc = await _firestore.collection('users').doc(user.uid).get();
       if (doc.exists && doc.data() != null) {
-        return UserModel.fromMap(doc.data()!, id: doc.id);
+        final existingUser = UserModel.fromMap(doc.data()!, id: doc.id);
+        if (existingUser.role == UserRole.patient) {
+          final docQuery = await _firestore
+              .collection('doctors')
+              .where('userId', isEqualTo: user.uid)
+              .limit(1)
+              .get();
+          if (docQuery.docs.isNotEmpty) {
+            await _firestore
+                .collection('users')
+                .doc(user.uid)
+                .update({'role': 'doctor'});
+            return existingUser.copyWith(role: UserRole.doctor);
+          }
+        }
+        return existingUser;
       }
+
+      // Check if this user belongs to a doctor record
+      final docQuery = await _firestore
+          .collection('doctors')
+          .where('userId', isEqualTo: user.uid)
+          .limit(1)
+          .get();
+      final isDoctor = docQuery.docs.isNotEmpty;
+      final assignedRole = isDoctor
+          ? UserRole.doctor
+          : (email.contains('admin') ? UserRole.admin : UserRole.patient);
 
       // Default model if record is pending
       final nowIso = DateTime.now().toUtc().toIso8601String();
       final userModel = UserModel(
         id: user.uid,
         email: user.email ?? email,
-        displayName: user.displayName ?? 'User',
-        role: UserRole.patient,
+        displayName: user.displayName ?? (isDoctor ? 'Doctor' : 'User'),
+        role: assignedRole,
         createdAt: nowIso,
         updatedAt: nowIso,
       );

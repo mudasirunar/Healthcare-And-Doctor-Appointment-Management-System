@@ -9,6 +9,7 @@ import '../../../../core/widgets/state_views.dart';
 import '../../../admin/presentation/screens/admin_doctor_detail_screen.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import '../../../doctor/domain/entities/specialty_model.dart';
+import '../../../auth/domain/entities/user_model.dart';
 import '../../../patient/presentation/screens/doctor_details_screen.dart';
 import 'unified_specialties_screen.dart';
 
@@ -309,6 +310,17 @@ class _UnifiedSpecialtyDoctorsScreenState
                                   MaterialPageRoute(
                                     builder: (_) => AdminDoctorDetailScreen(
                                       doctorId: doc.id,
+                                    ),
+                                  ),
+                                );
+                              } else if (widget.role ==
+                                  SpecialtyScreenRole.doctor) {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => UnifiedDoctorDetailScreen(
+                                      doctorId: doc.id,
+                                      role: UserRole.doctor,
                                     ),
                                   ),
                                 );

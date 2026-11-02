@@ -12,7 +12,6 @@ import '../../../../core/widgets/state_views.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../auth/domain/entities/user_model.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
-import '../../../../core/services/presence_service.dart';
 import '../../domain/entities/chat_message_model.dart';
 
 enum _ChatFilterTab { all, unread }
@@ -67,7 +66,7 @@ class _MessageStatusTick extends StatelessWidget {
   }
 }
 
-const double kChatTileHeight = 84.0;
+const double kChatTileHeight = 90.0;
 
 /// Reusable conversations hub for both Patients and Doctors.
 class UnifiedChatsHubScreen extends ConsumerStatefulWidget {
@@ -424,11 +423,7 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
     final participantKey = isPatient ? doctorKey : patientKey;
 
     final participantName = isPatient ? apt.doctorName : apt.patientName;
-    final participantSubtitle = isPatient
-        ? apt.doctorSpecialty
-        : (apt.reasonForVisit.isNotEmpty
-            ? apt.reasonForVisit
-            : 'Consultation');
+    final participantSubtitle = isPatient ? apt.doctorSpecialty : '';
 
     // Determine presence target user ID
     String targetUserId = isPatient ? apt.doctorId : apt.patientId;
@@ -452,25 +447,6 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
 
     final isCall = hasLastMsg && apt.lastMessageContent!.startsWith('VIDEO_CALL:');
 
-    // Determine WhatsApp-style message delivery and read status
-    MessageTickStatus? messageTick;
-    if (hasLastMsg && isSentByMe && !isCall) {
-      final recipientUnread = isPatient
-          ? apt.unreadCountForDoctor
-          : apt.unreadCountForPatient;
-
-      final isRecipientOnline =
-          PresenceService.instance.isUserOnline(targetUserId);
-
-      if (recipientUnread == 0) {
-        messageTick = MessageTickStatus.read; // Double blue tick (seen)
-      } else if (isRecipientOnline) {
-        messageTick = MessageTickStatus.delivered; // Double gray tick (online/reached)
-      } else {
-        messageTick = MessageTickStatus.sent; // Single gray tick (offline)
-      }
-    }
-
     // Display text:
     // - If sent by me: clean message text without "You: " prefix (the tick icon indicates it's yours!)
     // - If received: clean message text without sender name prefix
@@ -488,6 +464,7 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
     }
 
     // Smart snippet preview when query matches older chat history
+    bool isHistoricalSnippet = false;
     if (_query.trim().isNotEmpty) {
       final qLower = _query.trim().toLowerCase();
       final history = _chatHistoryCache[participantKey] ?? [];
@@ -505,7 +482,7 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
             .firstOrNull;
         if (matchedMsg != null) {
           lastMessageDisplay = 'Matched: "${matchedMsg.content}"';
-          messageTick = null; // Don't show tick on historical search snippet
+          isHistoricalSnippet = true;
         }
       }
     }
@@ -513,6 +490,10 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
     final timeStr = apt.lastMessageSentAtUtc != null
         ? DateTimeUtils.formatRelativeTime(apt.lastMessageSentAtUtc!)
         : null;
+
+    final recipientUnread = isPatient
+        ? apt.unreadCountForDoctor
+        : apt.unreadCountForPatient;
 
     return AnimatedPositioned(
       key: ValueKey(participantKey),
@@ -531,7 +512,8 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
         lastMessageText: lastMessageDisplay,
         isCallRecord: isCall,
         timeText: timeStr,
-        messageTick: messageTick,
+        isSentByMe: hasLastMsg && isSentByMe && !isCall && !isHistoricalSnippet,
+        recipientUnread: recipientUnread,
         unreadCount: itemUnreadCount,
         hasUnread: hasUnread,
         isSystemPlaceholder: !hasLastMsg,
@@ -603,7 +585,8 @@ class _ConversationListTile extends ConsumerWidget {
   final String lastMessageText;
   final bool isCallRecord;
   final String? timeText;
-  final MessageTickStatus? messageTick;
+  final bool isSentByMe;
+  final int recipientUnread;
   final int unreadCount;
   final bool hasUnread;
   final bool isSystemPlaceholder;
@@ -619,7 +602,8 @@ class _ConversationListTile extends ConsumerWidget {
     required this.lastMessageText,
     this.isCallRecord = false,
     required this.timeText,
-    this.messageTick,
+    this.isSentByMe = false,
+    this.recipientUnread = 0,
     required this.unreadCount,
     required this.hasUnread,
     required this.isSystemPlaceholder,
@@ -636,6 +620,17 @@ class _ConversationListTile extends ConsumerWidget {
             .watch(userPresenceStreamProvider(participantUserId))
             .valueOrNull ??
         false;
+
+    MessageTickStatus? effectiveTick;
+    if (isSentByMe) {
+      if (recipientUnread == 0) {
+        effectiveTick = MessageTickStatus.read; // Double blue tick
+      } else if (isOnline) {
+        effectiveTick = MessageTickStatus.delivered; // Double gray tick
+      } else {
+        effectiveTick = MessageTickStatus.sent; // Single gray tick
+      }
+    }
 
     final Color unreadBgColor = isDark
         ? AppColors.primary.withValues(alpha: 0.12)
@@ -665,7 +660,7 @@ class _ConversationListTile extends ConsumerWidget {
         child: Stack(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
@@ -751,17 +746,21 @@ class _ConversationListTile extends ConsumerWidget {
                       ],
                     ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    participantSubtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w600,
+                  if (participantSubtitle.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      participantSubtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
+                    const SizedBox(height: 3),
+                  ] else ...[
+                    const SizedBox(height: 6),
+                  ],
                   Row(
                     children: [
                       if (isCallRecord) ...[
@@ -771,8 +770,8 @@ class _ConversationListTile extends ConsumerWidget {
                           color: hasUnread ? AppColors.primary : textSecondary,
                         ),
                         const SizedBox(width: 4),
-                      ] else if (messageTick != null) ...[
-                        _MessageStatusTick(status: messageTick!),
+                      ] else if (effectiveTick != null) ...[
+                        _MessageStatusTick(status: effectiveTick),
                         const SizedBox(width: 4),
                       ],
                       Expanded(
