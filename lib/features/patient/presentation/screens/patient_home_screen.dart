@@ -232,7 +232,7 @@ class _PatientHomeScreenState extends ConsumerState<PatientHomeScreen> {
                     children: [
                       _DashboardMetricTile(
                         title: 'Prescriptions',
-                        value: '${completedAppointments.where((a) => a.consultationNotes != null || a.prescriptionId != null).length}',
+                        value: '${completedAppointments.where((a) => a.prescriptionId != null && a.prescriptionId!.isNotEmpty).length}',
                         subtitle: 'Active records',
                         icon: Icons.medication_outlined,
                         onTap: () {

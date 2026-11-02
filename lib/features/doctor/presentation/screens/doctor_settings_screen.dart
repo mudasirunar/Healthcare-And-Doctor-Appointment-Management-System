@@ -324,14 +324,6 @@ class _DoctorSettingsScreenState extends ConsumerState<DoctorSettingsScreen> {
                 child: Column(
                   children: [
                     _SettingsNavTile(
-                      icon: Icons.schedule_rounded,
-                      title: 'Working Hours & Shifts',
-                      subtitle: 'Configure daily active slots and shift hours',
-                      onTap: () => context.push('/doctor/availability'),
-                      borderColor: borderColor,
-                    ),
-                    Divider(height: 1, indent: 56, color: borderColor),
-                    _SettingsNavTile(
                       icon: Icons.local_hospital_rounded,
                       title: 'Hospital Departments',
                       subtitle: 'Browse clinical specialties and colleagues',

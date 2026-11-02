@@ -11,7 +11,6 @@ import '../../features/patient/presentation/screens/patient_specialties_screen.d
 import '../../features/consultation/presentation/screens/patient_chats_hub_screen.dart';
 import '../../features/consultation/presentation/screens/doctor_chats_hub_screen.dart';
 import '../../features/doctor/presentation/screens/doctor_main_screen.dart';
-import '../../features/doctor/presentation/screens/doctor_availability_screen.dart';
 import '../../features/doctor/presentation/screens/doctor_notifications_screen.dart';
 import '../../features/doctor/presentation/screens/doctor_practice_insights_screen.dart';
 import '../../features/doctor/presentation/screens/doctor_agenda_screen.dart';
@@ -86,10 +85,6 @@ final appRouter = GoRouter(
     GoRoute(
       path: '/doctor/workspace',
       builder: (context, state) => const DoctorMainScreen(),
-    ),
-    GoRoute(
-      path: '/doctor/availability',
-      builder: (context, state) => const DoctorAvailabilityScreen(),
     ),
     GoRoute(
       path: '/doctor/chats',

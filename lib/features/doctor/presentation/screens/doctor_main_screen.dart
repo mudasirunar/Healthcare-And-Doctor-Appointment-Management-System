@@ -9,8 +9,8 @@ import '../../../../core/widgets/app_dialog.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../domain/entities/doctor_model.dart';
 import 'doctor_dashboard_screen.dart';
+import 'doctor_agenda_screen.dart';
 import 'doctor_requests_screen.dart';
-import 'doctor_availability_screen.dart';
 import 'doctor_settings_screen.dart';
 import 'doctor_notifications_screen.dart';
 
@@ -23,8 +23,8 @@ class DoctorMainScreen extends ConsumerStatefulWidget {
 
 class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
   final ScrollController _dashboardScrollController = ScrollController();
+  final ScrollController _agendaScrollController = ScrollController();
   final ScrollController _requestsScrollController = ScrollController();
-  final ScrollController _availabilityScrollController = ScrollController();
   final ScrollController _settingsScrollController = ScrollController();
 
   late final List<ScrollController> _scrollControllers;
@@ -35,14 +35,14 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
     super.initState();
     _scrollControllers = [
       _dashboardScrollController,
+      _agendaScrollController,
       _requestsScrollController,
-      _availabilityScrollController,
       _settingsScrollController,
     ];
     _pages = [
       DoctorDashboardScreen(scrollController: _dashboardScrollController),
+      DoctorAgendaScreen(scrollController: _agendaScrollController),
       DoctorRequestsScreen(scrollController: _requestsScrollController),
-      DoctorAvailabilityScreen(scrollController: _availabilityScrollController),
       DoctorSettingsScreen(
         scrollController: _settingsScrollController,
         onSignOut: _handleSignOut,
@@ -53,8 +53,8 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
   @override
   void dispose() {
     _dashboardScrollController.dispose();
+    _agendaScrollController.dispose();
     _requestsScrollController.dispose();
-    _availabilityScrollController.dispose();
     _settingsScrollController.dispose();
     super.dispose();
   }
@@ -183,16 +183,16 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
             activeIcon: Icons.dashboard_rounded,
             label: 'Dashboard',
           ),
+          const AppNavItem(
+            icon: Icons.event_note_outlined,
+            activeIcon: Icons.event_note_rounded,
+            label: 'Agenda',
+          ),
           AppNavItem(
             icon: Icons.mark_email_unread_outlined,
             activeIcon: Icons.mark_email_unread_rounded,
             label: 'Requests',
             badgeCount: pendingRequestsCount,
-          ),
-          const AppNavItem(
-            icon: Icons.schedule_outlined,
-            activeIcon: Icons.schedule_rounded,
-            label: 'Availability',
           ),
           const AppNavItem(
             icon: Icons.settings_outlined,
@@ -302,6 +302,37 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Text(
+                'Consultation Agenda',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 18,
+                  color: textPrimary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Scheduled sessions, timeline & clinical queue',
+                style: AppTypography.caption.copyWith(
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              chatButton,
+              const SizedBox(width: 8),
+              notificationBell,
+            ],
+          ),
+        ),
+      2 => (
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
                 'Booking Requests',
                 style: AppTypography.headline.copyWith(
                   fontSize: 18,
@@ -326,30 +357,6 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
               notificationBell,
             ],
           ),
-        ),
-      2 => (
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'Practice Availability',
-                style: AppTypography.headline.copyWith(
-                  fontSize: 18,
-                  color: textPrimary,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Working shifts, slot durations & blackout dates',
-                style: AppTypography.caption.copyWith(
-                  color: textSecondary,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          null,
         ),
       _ => (
           Column(

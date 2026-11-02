@@ -256,7 +256,6 @@ class _AdminAppointmentsScreenState
                         a.doctorSpecialty,
                         a.reasonForVisit,
                         a.status.displayName,
-                        a.consultationNotes,
                         a.patientEmail,
                         a.id,
                       ],

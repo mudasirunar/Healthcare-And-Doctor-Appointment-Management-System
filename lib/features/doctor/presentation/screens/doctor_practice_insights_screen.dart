@@ -75,10 +75,8 @@ class DoctorPracticeInsightsScreen extends ConsumerWidget {
                   completed.map((a) => a.patientId).toSet().length;
               final int prescriptionsCount = completed
                   .where((a) =>
-                      (a.prescriptionId != null &&
-                          a.prescriptionId!.isNotEmpty) ||
-                      (a.consultationNotes != null &&
-                          a.consultationNotes!.isNotEmpty))
+                      a.prescriptionId != null &&
+                      a.prescriptionId!.isNotEmpty)
                   .length;
 
               final totalResolved = completed.length + cancelled.length;

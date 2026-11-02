@@ -68,7 +68,8 @@ class _PatientSettingsScreenState extends ConsumerState<PatientSettingsScreen> {
         .toList();
 
     final prescriptionsCount = completedVisits
-        .where((a) => a.prescriptionId != null || a.consultationNotes != null)
+        .where((a) =>
+            a.prescriptionId != null && a.prescriptionId!.isNotEmpty)
         .length;
 
     double totalSpent = 0.0;

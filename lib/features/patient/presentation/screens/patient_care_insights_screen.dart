@@ -109,7 +109,8 @@ class PatientCareInsightsScreen extends ConsumerWidget {
               .toList();
 
           final prescriptionsCount = completed
-              .where((a) => a.prescriptionId != null || a.consultationNotes != null)
+              .where((a) =>
+                  a.prescriptionId != null && a.prescriptionId!.isNotEmpty)
               .length;
 
           // Adherence Rate

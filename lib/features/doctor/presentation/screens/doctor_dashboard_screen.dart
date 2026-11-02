@@ -5,15 +5,12 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
-import '../../../../core/widgets/app_dialog.dart';
-import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../auth/domain/entities/user_model.dart';
 import '../../../consultation/presentation/screens/prescription_builder_dialog.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
-import 'doctor_agenda_screen.dart';
 import 'doctor_practice_insights_screen.dart';
 import 'unified_specialties_screen.dart';
 import 'unified_specialty_doctors_screen.dart';
@@ -29,51 +26,6 @@ class DoctorDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
-
-  void _showNotesDialog(AppointmentModel apt) {
-    final notesController =
-        TextEditingController(text: apt.consultationNotes ?? '');
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AppDialog(
-        icon: Icons.note_alt_outlined,
-        tone: AppDialogTone.primary,
-        title: 'Clinical Observations',
-        message: 'Patient: ${apt.patientName} • Reason: "${apt.reasonForVisit}"',
-        content: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: TextField(
-            controller: notesController,
-            maxLines: 4,
-            decoration: const InputDecoration(
-              labelText: 'Clinical Notes',
-              hintText: 'Enter clinical impressions, diagnosis, symptoms, or observations...',
-              alignLabelWithHint: true,
-            ),
-          ),
-        ),
-        cancelLabel: 'Cancel',
-        onCancel: () => Navigator.pop(ctx),
-        confirmLabel: 'Save Notes',
-        onConfirm: () async {
-          Navigator.pop(ctx);
-          final user = ref.read(currentUserProvider);
-          await ref.read(appointmentRepositoryProvider).updateStatus(
-                appointmentId: apt.id,
-                targetStatus: apt.status,
-                actorUserId: user?.id ?? 'doctor',
-                note: notesController.text.trim(),
-              );
-          ref.invalidate(userAppointmentsProvider);
-          if (mounted) {
-            AppSnackBar.showSuccess(context, 'Clinical notes saved.');
-          }
-        },
-      ),
-    );
-  }
-
   void _startConsultation(AppointmentModel apt) async {
     final user = ref.read(currentUserProvider);
     if (apt.status == AppointmentStatus.confirmed) {
@@ -191,12 +143,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   subtitle: 'Scheduled visits',
                   icon: Icons.calendar_today_rounded,
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const DoctorAgendaScreen(),
-                      ),
-                    );
+                    ref.read(doctorSelectedTabProvider.notifier).state = 1;
                   },
                 ),
                 const SizedBox(width: 12),
@@ -206,7 +153,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   subtitle: 'Pending review',
                   icon: Icons.mark_email_unread_rounded,
                   onTap: () {
-                    ref.read(doctorSelectedTabProvider.notifier).state = 1;
+                    ref.read(doctorSelectedTabProvider.notifier).state = 2;
                   },
                 ),
               ],
@@ -220,12 +167,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   subtitle: 'Past consultations',
                   icon: Icons.check_circle_outline_rounded,
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const DoctorAgendaScreen(),
-                      ),
-                    );
+                    ref.read(doctorSelectedTabProvider.notifier).state = 1;
                   },
                 ),
                 const SizedBox(width: 12),
@@ -374,21 +316,6 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                           icon: const Icon(Icons.chat_bubble_outline_rounded,
                               size: 15),
                           label: const Text('Chat'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: textPrimary,
-                            side: BorderSide(color: borderColor),
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9),
-                            ),
-                          ),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => _showNotesDialog(heroAppointment),
-                          icon: const Icon(Icons.edit_note_rounded, size: 16),
-                          label: const Text('Notes'),
                           style: OutlinedButton.styleFrom(
                             foregroundColor: textPrimary,
                             side: BorderSide(color: borderColor),
@@ -654,12 +581,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   ),
                   TextButton.icon(
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const DoctorAgendaScreen(),
-                        ),
-                      );
+                      ref.read(doctorSelectedTabProvider.notifier).state = 1;
                     },
                     icon: const Icon(Icons.arrow_forward_rounded, size: 14),
                     label: const Text('View All'),
@@ -675,24 +597,14 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
               ),
             ),
 
-            // Flat Consultation Agenda Card / Next Session Preview
+            // Flat Consultation Agenda On-Screen Row / Shortcut
+            Divider(height: 1, color: borderColor),
             InkWell(
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DoctorAgendaScreen(),
-                  ),
-                );
+                ref.read(doctorSelectedTabProvider.notifier).state = 1;
               },
-              borderRadius: BorderRadius.circular(14),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: surfaceColor,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: borderColor),
-                ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
                 child: heroAppointment != null
                     ? Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -863,36 +775,41 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                       ),
               ),
             ),
+            Divider(height: 1, color: borderColor),
+            const SizedBox(height: 20),
 
-            const SizedBox(height: 22),
-
-            // 5. My Patients Section
+            // 5. My Patients Section (Flat On-Screen Design - No Cards)
             if (myPatients.isNotEmpty) ...[
-              Text(
-                'My Patients (${myPatients.length})',
-                style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  color: textPrimary,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'My Patients (${myPatients.length})',
+                          style: AppTypography.headline.copyWith(
+                            fontSize: 17,
+                            color: textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Clinical directory & consultation history',
+                          style: AppTypography.caption.copyWith(color: textSecondary),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Material(
-                color: surfaceColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  side: BorderSide(color: borderColor),
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: myPatients.length > 5 ? 5 : myPatients.length,
-                  separatorBuilder: (_, __) => Divider(height: 1, indent: 64, color: borderColor),
-                  itemBuilder: (context, index) {
-                    final apt = myPatients[index];
-
-                    return ListTile(
+              Divider(height: 1, color: borderColor),
+              ...myPatients.take(5).map((apt) {
+                return Column(
+                  children: [
+                    InkWell(
                       onTap: () {
                         Navigator.push(
                           context,
@@ -904,34 +821,61 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                           ),
                         );
                       },
-                      leading: CircleAvatar(
-                        radius: 20,
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                        child: Text(
-                          apt.patientName.isNotEmpty ? apt.patientName[0].toUpperCase() : 'P',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+                        child: Row(
+                          children: [
+                            CircleAvatar(
+                              radius: 20,
+                              backgroundColor:
+                                  AppColors.primary.withValues(alpha: 0.12),
+                              child: Text(
+                                apt.patientName.isNotEmpty
+                                    ? apt.patientName[0].toUpperCase()
+                                    : 'P',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    apt.patientName,
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                      color: textPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Last visit: ${DateTimeUtils.formatRelativeTime(apt.scheduledTimeUtc)}${apt.reasonForVisit.isNotEmpty ? " • ${apt.reasonForVisit}" : ""}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: textSecondary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(Icons.chevron_right_rounded, color: textSecondary),
+                          ],
                         ),
                       ),
-                      title: Text(
-                        apt.patientName,
-                        style: TextStyle(
-                          fontSize: 14.5,
-                          fontWeight: FontWeight.w600,
-                          color: textPrimary,
-                        ),
-                      ),
-                      subtitle: Text(
-                        'Last visit: ${DateTimeUtils.formatRelativeTime(apt.scheduledTimeUtc)}',
-                        style: TextStyle(fontSize: 11.5, color: textSecondary),
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded, size: 20),
-                    );
-                  },
-                ),
-              ),
+                    ),
+                    Divider(height: 1, indent: 58, color: borderColor),
+                  ],
+                );
+              }),
+              const SizedBox(height: 24),
             ],
           ],
         );

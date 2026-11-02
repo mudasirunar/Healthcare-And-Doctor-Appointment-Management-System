@@ -373,22 +373,6 @@ class PatientAppointmentDetailScreen extends ConsumerWidget {
                   height: 1.4,
                 ),
               ),
-              if (appointment.consultationNotes != null &&
-                  appointment.consultationNotes!.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'Consultation Notes',
-                  style: AppTypography.headline.copyWith(color: textPrimary),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  appointment.consultationNotes!,
-                  style: AppTypography.bodyMedium.copyWith(
-                    color: textSecondary,
-                    height: 1.4,
-                  ),
-                ),
-              ],
               if (appointment.cancellationReason != null &&
                   appointment.cancellationReason!.isNotEmpty) ...[
                 const SizedBox(height: 16),
