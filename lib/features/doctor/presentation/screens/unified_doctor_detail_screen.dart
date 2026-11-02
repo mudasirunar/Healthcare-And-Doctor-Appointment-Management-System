@@ -339,17 +339,14 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
         return Scaffold(
           backgroundColor: AppColors.backgroundOf(context),
           appBar: AppBar(
-            title: Text(isSelf ? 'My Professional Profile' : 'Specialist Profile'),
+            title: Text(isSelf ? 'My Profile' : 'Specialist Profile'),
             backgroundColor: surfaceColor,
             elevation: 0,
             scrolledUnderElevation: 0,
-            bottom: isPatient
-                ? PreferredSize(
-                    preferredSize: const Size.fromHeight(1),
-                    child:
-                        Divider(height: 1, thickness: 1, color: borderColor),
-                  )
-                : null,
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Divider(height: 1, thickness: 1, color: borderColor),
+            ),
             actions: [
               if (isAdmin) ...[
                 IconButton(
@@ -722,8 +719,10 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
                           ),
                         );
                       }),
-                    const SizedBox(height: 8),
-                    Divider(height: 1, color: borderColor),
+                    if (isAdmin || isPatient) ...[
+                      const SizedBox(height: 8),
+                      Divider(height: 1, color: borderColor),
+                    ],
 
                     // 5. Appointments Section
                     if (isAdmin) ...[
@@ -947,7 +946,7 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
                           ),
                         ),
                       ),
-                    ] else ...[
+                    ] else if (isPatient) ...[
                       // Patient view: Past Consultations & Prescriptions with this Doctor
                       Padding(
                         padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
