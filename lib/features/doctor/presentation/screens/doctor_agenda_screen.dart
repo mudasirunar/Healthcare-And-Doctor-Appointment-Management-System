@@ -510,7 +510,11 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
                 child: filtered.isEmpty
                     ? Center(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          padding: EdgeInsets.only(
+                            left: 24,
+                            right: 24,
+                            bottom: widget.isStandalone ? 24 : 100,
+                          ),
                           child: EmptyStateView(
                             icon: Icons.event_available_rounded,
                             title: _searchQuery.isNotEmpty
@@ -525,7 +529,12 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
                     : ListView.separated(
                         controller: _internalScrollController,
                         physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          12,
+                          16,
+                          widget.isStandalone ? 32 : 130,
+                        ),
                         itemCount: filtered.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
