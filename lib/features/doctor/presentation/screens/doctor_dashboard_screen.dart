@@ -126,6 +126,14 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
 
     final allAppointments = appointmentsAsync.valueOrNull ?? [];
     final specialties = specialtiesAsync.valueOrNull ?? [];
+    final doctorsAsync = ref.watch(verifiedDoctorsStreamProvider);
+    final allDoctors = doctorsAsync.valueOrNull ?? [];
+
+    final Map<String, int> doctorCountBySpecialtyId = {};
+    for (final spec in specialties) {
+      doctorCountBySpecialtyId[spec.id] =
+          allDoctors.where((d) => d.specialtyId == spec.id).length;
+    }
 
     // Metrics calculations
     final now = DateTime.now();
@@ -262,72 +270,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Flat Practice & Clinical Insights Banner (Matching Patient side style)
-            Divider(height: 1, color: borderColor),
-            InkWell(
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const DoctorPracticeInsightsScreen(),
-                  ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 4,
-                  vertical: 14,
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 44,
-                      height: 44,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.insights_rounded,
-                        color: AppColors.primary,
-                        size: 22,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Practice & Clinical Insights',
-                            style: AppTypography.bodyLarge.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: textPrimary,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            completedVisits.isEmpty
-                                ? 'Review clinical performance, revenue & volume trends'
-                                : '${completedVisits.length} visits completed • $completionRate% completion • \$${totalEarnings.toStringAsFixed(0)} revenue',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.caption.copyWith(
-                              color: textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(Icons.chevron_right_rounded, color: textSecondary),
-                  ],
-                ),
-              ),
-            ),
-            Divider(height: 1, color: borderColor),
-            const SizedBox(height: 20),
-
-            // 2. Hero Active / Next Up Consultation Card
+            // 2. Hero Active / Next Up Consultation Card (if any)
             if (heroAppointment != null) ...[
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -501,78 +444,188 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   ],
                 ),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 18),
             ],
 
-            // 3. Hospital Departments & Specialties Explorer
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Hospital Departments',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: textPrimary,
+            // 3. Flat Practice & Clinical Insights Banner (Matching Patient side style)
+            Divider(height: 1, color: borderColor),
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DoctorPracticeInsightsScreen(),
                   ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 14,
                 ),
-                TextButton(
-                  onPressed: () => context.push('/doctor/specialties'),
-                  child: const Text('View All', style: TextStyle(fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            SizedBox(
-              height: 52,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: specialties.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, index) {
-                  final spec = specialties[index];
-                  return InkWell(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => UnifiedSpecialtyDoctorsScreen(
-                            specialty: spec,
-                            role: SpecialtyScreenRole.doctor,
-                          ),
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(10),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
                       decoration: BoxDecoration(
-                        color: surfaceColor,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: borderColor),
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
                       ),
-                      child: Row(
+                      child: const Icon(
+                        Icons.insights_rounded,
+                        color: AppColors.primary,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.local_hospital_rounded,
-                              size: 16, color: spec.accentColor),
-                          const SizedBox(width: 8),
                           Text(
-                            spec.name,
-                            style: TextStyle(
-                              fontSize: 13,
+                            'Practice & Clinical Insights',
+                            style: AppTypography.bodyLarge.copyWith(
                               fontWeight: FontWeight.w600,
                               color: textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            completedVisits.isEmpty
+                                ? 'Review clinical performance, revenue & volume trends'
+                                : '${completedVisits.length} visits completed • $completionRate% completion • \$${totalEarnings.toStringAsFixed(0)} revenue',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.caption.copyWith(
+                              color: textSecondary,
                             ),
                           ),
                         ],
                       ),
                     ),
-                  );
-                },
+                    Icon(Icons.chevron_right_rounded, color: textSecondary),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 22),
+            Divider(height: 1, color: borderColor),
+            const SizedBox(height: 16),
+
+            // 4. Medical Specialties Showcase (Flat with dynamic icons, matching patient side)
+            if (specialties.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Medical Specialties',
+                          style: AppTypography.headline.copyWith(
+                            fontSize: 17,
+                            color: textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'Clinical departments & verified specialists',
+                          style: AppTypography.caption.copyWith(color: textSecondary),
+                        ),
+                      ],
+                    ),
+                    TextButton.icon(
+                      onPressed: () => context.push('/doctor/specialties'),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                      label: const Text('See All'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(
+                height: 108,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: specialties.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 14),
+                  itemBuilder: (ctx, idx) {
+                    final spec = specialties[idx];
+                    final docCount = doctorCountBySpecialtyId[spec.id] ?? 0;
+
+                    return InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => UnifiedSpecialtyDoctorsScreen(
+                              specialty: spec,
+                              role: SpecialtyScreenRole.doctor,
+                            ),
+                          ),
+                        );
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 48,
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                spec.iconData,
+                                color: AppColors.primary,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(height: 7),
+                            SizedBox(
+                              width: 84,
+                              child: Text(
+                                spec.name,
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: textPrimary,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$docCount Doc${docCount == 1 ? '' : 's'}',
+                              textAlign: TextAlign.center,
+                              style: AppTypography.caption.copyWith(
+                                fontSize: 10.5,
+                                color: textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 14),
+              Divider(height: 1, color: borderColor),
+              const SizedBox(height: 20),
+            ],
 
             // 4. Consultation Agenda & Timeline
             Text(
