@@ -631,7 +631,8 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
 
             // Flat Consultation Agenda On-Screen Row / Shortcut
             Divider(height: 1, color: borderColor),
-            InkWell(
+            GestureDetector(
+              behavior: HitTestBehavior.opaque,
               onTap: () {
                 ref.read(doctorSelectedTabProvider.notifier).state = 1;
               },

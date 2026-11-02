@@ -57,6 +57,20 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
         .updateVerificationStatus(doctor.id, status, notes);
     ref.invalidate(filteredDoctorsProvider);
     ref.invalidate(allDoctorsAdminProvider);
+
+    final isApproved = status == VerificationStatus.approved;
+    UserNotificationService.instance.sendDoctorNotification(
+      doctorUserId: doctor.userId,
+      doctorId: doctor.id,
+      title: isApproved
+          ? 'Credentials Verified & Approved'
+          : 'Verification Update: Declined',
+      body: isApproved
+          ? 'Congratulations Dr. ${doctor.doctorName}, your medical credentials have been verified and approved by hospital administration. Your profile is now published.'
+          : 'Your credential review was updated to declined by administration.${notes != null && notes.isNotEmpty ? " Note: $notes" : ""}',
+      type: 'doctor_profile_updated',
+      targetId: doctor.id,
+    );
   }
 
   void _showQuickReassignSpecialtyDialog(

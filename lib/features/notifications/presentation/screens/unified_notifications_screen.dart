@@ -49,13 +49,16 @@ class AppNotificationItem {
   });
 
   /// Factory converter from PatientNotificationItem
-  factory AppNotificationItem.fromPatient(PatientNotificationItem item) {
+  factory AppNotificationItem.fromPatient(
+    PatientNotificationItem item, {
+    bool? isRead,
+  }) {
     return AppNotificationItem(
       id: item.id,
       title: item.title,
       body: item.body,
       timestampIso: item.createdAt,
-      isRead: item.isRead,
+      isRead: isRead ?? item.isRead,
       type: item.type,
       targetId: item.targetId,
       statusLabel: null,
@@ -109,7 +112,18 @@ class _UnifiedNotificationsScreenState
 
     switch (widget.role) {
       case NotificationRole.patient:
-        if (user != null) {
+        final items = ref.read(patientNotificationsStreamProvider).valueOrNull ?? [];
+        final readIds = ref.read(readNotificationsProvider);
+        final unreadIds = items
+            .where((n) => !n.isRead && !readIds.contains(n.id))
+            .map((n) => n.id)
+            .toList();
+        if (unreadIds.isNotEmpty) {
+          // Instant optimistic UI update
+          ref.read(readNotificationsProvider.notifier).markAllAsRead(unreadIds);
+          // Persistent backend update
+          await UserNotificationService.instance.markMultipleAsRead(unreadIds);
+        } else if (user != null) {
           await UserNotificationService.instance.markAllAsReadForUser(user.id);
         }
       case NotificationRole.admin:
@@ -120,18 +134,39 @@ class _UnifiedNotificationsScreenState
               .markAllAsRead(items.map((e) => e.id));
         }
       case NotificationRole.doctor:
-        if (user != null) {
-          await UserNotificationService.instance.markAllAsReadForUser(user.id);
+        final items = ref.read(doctorNotificationsStreamProvider).valueOrNull ?? [];
+        final readIds = ref.read(readNotificationsProvider);
+        final unreadIds = items
+            .where((n) => !n.isRead && !readIds.contains(n.id))
+            .map((n) => n.id)
+            .toList();
+        if (unreadIds.isNotEmpty) {
+          // Instant optimistic UI update
+          ref.read(readNotificationsProvider.notifier).markAllAsRead(unreadIds);
+          // Persistent backend update
+          await UserNotificationService.instance.markMultipleAsRead(unreadIds);
+        } else if (user != null) {
+          final doctorRecord = (ref.read(verifiedDoctorsStreamProvider).valueOrNull ?? [])
+              .where((d) => d.userId == user.id || d.id == user.id)
+              .firstOrNull;
+          await UserNotificationService.instance.markAllAsReadForUser(
+            user.id,
+            [if (doctorRecord?.id != null) doctorRecord!.id],
+          );
         }
     }
   }
 
   void _handleItemTap(AppNotificationItem item) {
+    // Smoothly mark as read in the post-frame callback so navigation begins
+    // instantly and gracefully without a jarring mid-tap UI recomposition
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(readNotificationsProvider.notifier).markAsRead(item.id);
+      UserNotificationService.instance.markAsRead(item.id);
+    });
+
     switch (widget.role) {
       case NotificationRole.patient:
-        // Mark as read in background without UI delay
-        UserNotificationService.instance.markAsRead(item.id);
-
         String? targetAppointmentId = item.targetId;
 
         // Smart fallback lookup for older notifications missing targetId
@@ -170,17 +205,35 @@ class _UnifiedNotificationsScreenState
           }
         }
 
-        if (item.type.contains('prescription') &&
-            item.targetId != null &&
-            item.targetId!.startsWith('rx_')) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => PrescriptionViewerScreen(
-                prescriptionId: item.targetId!,
+        if (item.type.contains('prescription')) {
+          String? rxId;
+          if (item.targetId != null && item.targetId!.startsWith('rx_')) {
+            rxId = item.targetId!;
+          } else {
+            final aptId = item.targetId ?? targetAppointmentId;
+            if (aptId != null && aptId.isNotEmpty) {
+              final userAppointments =
+                  ref.read(userAppointmentsProvider).valueOrNull ?? [];
+              final match =
+                  userAppointments.where((a) => a.id == aptId).firstOrNull;
+              if (match?.prescriptionId != null &&
+                  match!.prescriptionId!.isNotEmpty) {
+                rxId = match.prescriptionId!;
+              }
+            }
+          }
+
+          if (rxId != null && rxId.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => PrescriptionViewerScreen(
+                  prescriptionId: rxId!,
+                ),
               ),
-            ),
-          );
+            );
+            return;
+          }
         } else if (targetAppointmentId != null &&
             targetAppointmentId.isNotEmpty) {
           Navigator.push(
@@ -201,8 +254,6 @@ class _UnifiedNotificationsScreenState
         }
 
       case NotificationRole.admin:
-        ref.read(readNotificationsProvider.notifier).markAsRead(item.id);
-
         if (item.type == AdminNotificationType.doctorVerification.name ||
             item.type.contains('doctor')) {
           if (!item.isActionable) {
@@ -242,9 +293,149 @@ class _UnifiedNotificationsScreenState
         }
 
       case NotificationRole.doctor:
-        UserNotificationService.instance.markAsRead(item.id);
-        if (item.targetId != null && item.targetId!.isNotEmpty) {
-          context.go('/consultation/room/${item.targetId}');
+        String? targetAppointmentId = item.targetId;
+
+        // Smart fallback lookup for older notifications missing targetId
+        if (targetAppointmentId == null || targetAppointmentId.isEmpty) {
+          final userAppointments =
+              ref.read(userAppointmentsProvider).valueOrNull ?? [];
+          for (final apt in userAppointments) {
+            if (item.body.contains(apt.patientName) ||
+                item.title.contains(apt.patientName) ||
+                item.body.contains(apt.id) ||
+                item.id.contains(apt.id)) {
+              targetAppointmentId = apt.id;
+              break;
+            }
+          }
+        }
+
+        // 1. Prescription navigation
+        if (item.type.contains('prescription') &&
+            item.targetId != null &&
+            item.targetId!.startsWith('rx_')) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => PrescriptionViewerScreen(
+                prescriptionId: item.targetId!,
+              ),
+            ),
+          );
+          return;
+        }
+
+        // 2. Chat / Message notifications
+        if (item.type.contains('chat') || item.type.contains('message')) {
+          if (targetAppointmentId != null && targetAppointmentId.isNotEmpty) {
+            context.push('/consultation/chat/$targetAppointmentId');
+            return;
+          }
+        }
+
+        // 3. New booking requests (open appointment detail or switch to Requests tab)
+        if (item.type == 'appointment_requested' ||
+            item.type.contains('request')) {
+          if (targetAppointmentId != null && targetAppointmentId.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AdminAppointmentDetailScreen(
+                  appointmentId: targetAppointmentId!,
+                ),
+              ),
+            );
+          } else {
+            ref.read(doctorSelectedTabProvider.notifier).state = 2;
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              context.go('/doctor');
+            }
+          }
+          return;
+        }
+
+        // 4. Appointment status updates (cancelled, confirmed, in-progress, completed)
+        if (item.type.contains('appointment') ||
+            item.type.contains('cancelled') ||
+            item.type.contains('confirmed')) {
+          if (targetAppointmentId != null && targetAppointmentId.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => AdminAppointmentDetailScreen(
+                  appointmentId: targetAppointmentId!,
+                ),
+              ),
+            );
+          } else {
+            ref.read(doctorSelectedTabProvider.notifier).state = 1;
+            if (Navigator.canPop(context)) {
+              Navigator.pop(context);
+            } else {
+              context.go('/doctor');
+            }
+          }
+          return;
+        }
+
+        // 5. Doctor Profile, Verification & Credential updates
+        if (item.type.contains('doctor_profile') ||
+            item.type.contains('credential') ||
+            item.type.contains('verified')) {
+          final currentUser = ref.read(currentUserProvider);
+          final doctorRecord = (ref.read(verifiedDoctorsStreamProvider).valueOrNull ?? [])
+              .where((d) => d.userId == currentUser?.id || d.id == currentUser?.id)
+              .firstOrNull;
+          final docId = doctorRecord?.id ?? currentUser?.id ?? '';
+          if (docId.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UnifiedDoctorDetailScreen(
+                  doctorId: docId,
+                  role: UserRole.doctor,
+                ),
+              ),
+            );
+            return;
+          }
+        }
+
+        // 6. Patient Profile updates
+        if (item.type.contains('patient') &&
+            targetAppointmentId != null &&
+            targetAppointmentId.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => UnifiedPatientDetailScreen(
+                patientId: targetAppointmentId!,
+                role: UserRole.doctor,
+              ),
+            ),
+          );
+          return;
+        }
+
+        // 7. Generic fallback with targetId -> AdminAppointmentDetailScreen
+        if (targetAppointmentId != null && targetAppointmentId.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => AdminAppointmentDetailScreen(
+                appointmentId: targetAppointmentId!,
+              ),
+            ),
+          );
+        } else {
+          ref.read(doctorSelectedTabProvider.notifier).state = 0;
+          if (Navigator.canPop(context)) {
+            Navigator.pop(context);
+          } else {
+            context.go('/doctor');
+          }
         }
     }
   }
@@ -371,11 +562,20 @@ class _UnifiedNotificationsScreenState
     final borderColor = AppColors.borderOf(context);
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
+    final readIds = ref.watch(readNotificationsProvider);
 
     // Provide role-specific notification stream / list
-    if (widget.role == NotificationRole.patient ||
-        widget.role == NotificationRole.doctor) {
+    if (widget.role == NotificationRole.patient) {
       final notificationsAsync = ref.watch(patientNotificationsStreamProvider);
+
+      final items = notificationsAsync.valueOrNull ?? [];
+      final normalized = items
+          .map((i) => AppNotificationItem.fromPatient(
+                i,
+                isRead: i.isRead || readIds.contains(i.id),
+              ))
+          .toList();
+      final unreadCount = normalized.where((n) => !n.isRead).length;
 
       return _buildScaffold(
         context: context,
@@ -384,10 +584,7 @@ class _UnifiedNotificationsScreenState
         borderColor: borderColor,
         textPrimary: textPrimary,
         textSecondary: textSecondary,
-        unreadCount: notificationsAsync.valueOrNull
-                ?.where((n) => !n.isRead)
-                .length ??
-            0,
+        unreadCount: unreadCount,
         content: notificationsAsync.when(
           loading: () => const Center(
             child: CircularProgressIndicator(strokeWidth: 2.5),
@@ -396,9 +593,46 @@ class _UnifiedNotificationsScreenState
             message: err.toString(),
             onRetry: () => ref.refresh(patientNotificationsStreamProvider),
           ),
-          data: (items) {
-            final normalized =
-                items.map((i) => AppNotificationItem.fromPatient(i)).toList();
+          data: (_) {
+            return _buildNotificationList(
+              items: normalized,
+              isDark: isDark,
+              borderColor: borderColor,
+              textPrimary: textPrimary,
+              textSecondary: textSecondary,
+            );
+          },
+        ),
+      );
+    } else if (widget.role == NotificationRole.doctor) {
+      final notificationsAsync = ref.watch(doctorNotificationsStreamProvider);
+
+      final items = notificationsAsync.valueOrNull ?? [];
+      final normalized = items
+          .map((i) => AppNotificationItem.fromPatient(
+                i,
+                isRead: i.isRead || readIds.contains(i.id),
+              ))
+          .toList();
+      final unreadCount = normalized.where((n) => !n.isRead).length;
+
+      return _buildScaffold(
+        context: context,
+        isDark: isDark,
+        surfaceColor: surfaceColor,
+        borderColor: borderColor,
+        textPrimary: textPrimary,
+        textSecondary: textSecondary,
+        unreadCount: unreadCount,
+        content: notificationsAsync.when(
+          loading: () => const Center(
+            child: CircularProgressIndicator(strokeWidth: 2.5),
+          ),
+          error: (err, _) => ErrorStateView(
+            message: err.toString(),
+            onRetry: () => ref.refresh(doctorNotificationsStreamProvider),
+          ),
+          data: (_) {
             return _buildNotificationList(
               items: normalized,
               isDark: isDark,

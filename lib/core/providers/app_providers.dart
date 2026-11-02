@@ -61,26 +61,82 @@ final patientNotificationsStreamProvider = StreamProvider<List<PatientNotificati
   final user = ref.watch(currentUserProvider);
   if (user == null) return const Stream.empty();
 
+  final authUid = FirebaseAuth.instance.currentUser?.uid;
+  final effectiveUserId = (authUid != null && authUid.isNotEmpty) ? authUid : user.id;
+
   try {
-    return FirebaseFirestore.instance
-        .collection('notifications')
-        .where('userId', isEqualTo: user.id)
-        .snapshots()
-        .map((snapshot) {
+    Query<Map<String, dynamic>> query = FirebaseFirestore.instance.collection('notifications');
+
+    if (authUid != null && authUid.isNotEmpty && authUid != user.id) {
+      query = query.where('userId', whereIn: [user.id, authUid]);
+    } else {
+      query = query.where('userId', isEqualTo: effectiveUserId);
+    }
+
+    return query.snapshots().map((snapshot) {
       final list = snapshot.docs
           .map((doc) => PatientNotificationItem.fromMap(doc.data(), id: doc.id))
           .toList();
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return list;
-    }).handleError((_) => <PatientNotificationItem>[]);
-  } catch (_) {
+    });
+  } catch (e) {
+    debugPrint('patientNotificationsStreamProvider exception: $e');
     return Stream.value(<PatientNotificationItem>[]);
   }
 });
 
 final unreadPatientNotificationsCountProvider = Provider<int>((ref) {
   final asyncVal = ref.watch(patientNotificationsStreamProvider);
-  return asyncVal.valueOrNull?.where((n) => !n.isRead).length ?? 0;
+  final readIds = ref.watch(readNotificationsProvider);
+  return asyncVal.valueOrNull
+          ?.where((n) => !n.isRead && !readIds.contains(n.id))
+          .length ??
+      0;
+});
+
+final doctorNotificationsStreamProvider = StreamProvider<List<PatientNotificationItem>>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null) return const Stream.empty();
+
+  final doctorRecord = (ref.watch(verifiedDoctorsStreamProvider).valueOrNull ?? [])
+      .where((d) => d.userId == user.id || d.id == user.id)
+      .firstOrNull;
+  final currentDoctorId = doctorRecord?.id;
+
+  final userIds = <String>{user.id};
+  if (currentDoctorId != null && currentDoctorId.isNotEmpty) {
+    userIds.add(currentDoctorId);
+  }
+
+  try {
+    Query<Map<String, dynamic>> query = FirebaseFirestore.instance.collection('notifications');
+    if (userIds.length == 1) {
+      query = query.where('userId', isEqualTo: userIds.first);
+    } else {
+      query = query.where('userId', whereIn: userIds.toList());
+    }
+
+    return query.snapshots().map((snapshot) {
+      final list = snapshot.docs
+          .map((doc) => PatientNotificationItem.fromMap(doc.data(), id: doc.id))
+          .toList();
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list;
+    });
+  } catch (e) {
+    debugPrint('doctorNotificationsStreamProvider exception: $e');
+    return Stream.value(<PatientNotificationItem>[]);
+  }
+});
+
+final unreadDoctorNotificationsCountProvider = Provider<int>((ref) {
+  final asyncVal = ref.watch(doctorNotificationsStreamProvider);
+  final readIds = ref.watch(readNotificationsProvider);
+  return asyncVal.valueOrNull
+          ?.where((n) => !n.isRead && !readIds.contains(n.id))
+          .length ??
+      0;
 });
 
 // --- NAVIGATION STATE TABS (RESETTABLE ON LOGOUT / LOGIN) ---
@@ -332,9 +388,35 @@ final liveCurrentUserProvider = StreamProvider<UserModel?>((ref) {
   }
 });
 
+/// Live real-time stream of the current logged-in physician's profile in Firestore.
+/// Emits immediately whenever administration updates physician credentials or details.
+final currentDoctorRecordStreamProvider = StreamProvider<DoctorModel?>((ref) {
+  final user = ref.watch(currentUserProvider);
+  if (user == null || user.id.isEmpty) return Stream.value(null);
+
+  try {
+    return FirebaseFirestore.instance
+        .collection('doctors')
+        .where('userId', isEqualTo: user.id)
+        .snapshots()
+        .map((snapshot) {
+      if (snapshot.docs.isNotEmpty) {
+        final doc = snapshot.docs.first;
+        return DoctorModel.fromMap(doc.data(), id: doc.id);
+      }
+      return null;
+    });
+  } catch (e) {
+    debugPrint('currentDoctorRecordStreamProvider error: $e');
+    return Stream.value(null);
+  }
+});
+
 final currentUserProvider = StateProvider<UserModel?>((ref) {
-  final user = ref.watch(currentUserStreamProvider).valueOrNull;
-  return user;
+  final liveUser = ref.watch(liveCurrentUserProvider).valueOrNull;
+  if (liveUser != null) return liveUser;
+  final authUser = ref.watch(currentUserStreamProvider).valueOrNull;
+  return authUser;
 });
 
 // --- DOCTORS & SPECIALTIES (REAL-TIME STREAMS) ---
@@ -574,13 +656,19 @@ final adminNotificationsProvider = Provider<List<AdminNotificationItem>>((ref) {
   // 1. Pending doctors first (Actionable)
   for (final doc in doctors) {
     if (doc.verificationStatus == VerificationStatus.pending) {
+      final docTimestamp = doc.createdAt.isNotEmpty
+          ? doc.createdAt
+          : PreferencesService.instance.getNotificationTimestamp(
+              'doc_verify_${doc.id}',
+              '2026-11-01T08:00:00.000Z',
+            );
       items.add(
         AdminNotificationItem(
           id: 'doc_verify_${doc.id}',
           title: 'Credential Review Required: ${doc.doctorName}',
           subtitle:
               '${doc.specialtyName} • License ${doc.licenseNumber} • ${doc.experienceYears} yrs experience',
-          timestampIso: DateTime.now().toUtc().toIso8601String(),
+          timestampIso: docTimestamp,
           type: AdminNotificationType.doctorVerification,
           targetId: doc.id,
           isActionable: true,
@@ -638,12 +726,18 @@ final adminNotificationsProvider = Provider<List<AdminNotificationItem>>((ref) {
     if (doc.verificationStatus != VerificationStatus.pending &&
         (alertedIds.contains(notifId) || readIds.contains(notifId))) {
       final isApproved = doc.verificationStatus == VerificationStatus.approved;
+      final notifTimestamp = doc.createdAt.isNotEmpty
+          ? doc.createdAt
+          : PreferencesService.instance.getNotificationTimestamp(
+              notifId,
+              '2026-11-01T08:00:00.000Z',
+            );
       items.add(
         AdminNotificationItem(
           id: notifId,
           title: 'Doctor Verification: ${doc.doctorName}',
           subtitle: '${doc.specialtyName} • License ${doc.licenseNumber}',
-          timestampIso: DateTime.now().toUtc().toIso8601String(),
+          timestampIso: notifTimestamp,
           type: AdminNotificationType.doctorVerification,
           targetId: doc.id,
           isActionable: false,

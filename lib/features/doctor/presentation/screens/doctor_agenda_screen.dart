@@ -16,7 +16,7 @@ import '../../../auth/domain/entities/user_model.dart';
 import '../../../consultation/presentation/screens/doctor_prescription_screen.dart';
 import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
 
-enum AgendaTabSegment { active, completed, all, cancelled }
+enum AgendaTabSegment { all, active, completed, cancelled }
 
 enum AgendaSortMode {
   timeAscending,
@@ -47,7 +47,7 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
   late final ScrollController _internalScrollController;
 
   String _searchQuery = '';
-  AgendaTabSegment _selectedSegment = AgendaTabSegment.active;
+  AgendaTabSegment _selectedSegment = AgendaTabSegment.all;
   String? _selectedFilterChip; // e.g. 'today', 'confirmed', 'inProgress', null
   AgendaSortMode _sortMode = AgendaSortMode.timeAscending;
 
@@ -295,10 +295,10 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
 
           // Filter by active segment tab
           List<AppointmentModel> segmentAppointments = switch (_selectedSegment) {
+            AgendaTabSegment.all => allAppointments,
             AgendaTabSegment.active => activeList,
             AgendaTabSegment.completed => completedList,
             AgendaTabSegment.cancelled => cancelledList,
-            AgendaTabSegment.all => allAppointments,
           };
 
           // Filter by AutoCenterFilterChip if selected
@@ -347,38 +347,42 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
                 child: Column(
                   children: [
                     Container(
-                      height: 42,
-                      padding: const EdgeInsets.all(3),
+                      height: 44,
+                      padding: const EdgeInsets.all(3.5),
                       decoration: BoxDecoration(
                         color: AppColors.surfaceVariantOf(context),
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(13),
                         border: Border.all(color: borderColor),
                       ),
                       child: Row(
                         children: [
                           _SegmentButton(
-                            label: 'Active (${activeList.length})',
-                            isSelected: _selectedSegment == AgendaTabSegment.active,
-                            onTap: () => setState(
-                              () => _selectedSegment = AgendaTabSegment.active,
-                            ),
-                          ),
-                          _SegmentButton(
-                            label: 'Done (${completedList.length})',
-                            isSelected: _selectedSegment == AgendaTabSegment.completed,
-                            onTap: () => setState(
-                              () => _selectedSegment = AgendaTabSegment.completed,
-                            ),
-                          ),
-                          _SegmentButton(
-                            label: 'All (${allAppointments.length})',
+                            label: 'All',
+                            count: allAppointments.length,
                             isSelected: _selectedSegment == AgendaTabSegment.all,
                             onTap: () => setState(
                               () => _selectedSegment = AgendaTabSegment.all,
                             ),
                           ),
                           _SegmentButton(
-                            label: 'Past/Other',
+                            label: 'Active',
+                            count: activeList.length,
+                            isSelected: _selectedSegment == AgendaTabSegment.active,
+                            onTap: () => setState(
+                              () => _selectedSegment = AgendaTabSegment.active,
+                            ),
+                          ),
+                          _SegmentButton(
+                            label: 'Done',
+                            count: completedList.length,
+                            isSelected: _selectedSegment == AgendaTabSegment.completed,
+                            onTap: () => setState(
+                              () => _selectedSegment = AgendaTabSegment.completed,
+                            ),
+                          ),
+                          _SegmentButton(
+                            label: 'Other',
+                            count: cancelledList.length,
                             isSelected: _selectedSegment == AgendaTabSegment.cancelled,
                             onTap: () => setState(
                               () => _selectedSegment = AgendaTabSegment.cancelled,
@@ -533,7 +537,7 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
                           16,
                           12,
                           16,
-                          widget.isStandalone ? 32 : 130,
+                          widget.isStandalone ? 32 : 140,
                         ),
                         itemCount: filtered.length,
                         separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -923,49 +927,91 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
 
 class _SegmentButton extends StatelessWidget {
   final String label;
+  final int? count;
   final bool isSelected;
   final VoidCallback onTap;
 
   const _SegmentButton({
     required this.label,
+    this.count,
     required this.isSelected,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final textPrimary = AppColors.textPrimaryOf(context);
+    final textSecondary = AppColors.textSecondaryOf(context);
     final isDark = AppColors.isDark(context);
+    final activeBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+    final activeBorder = isDark
+        ? AppColors.primary.withValues(alpha: 0.28)
+        : AppColors.borderOf(context).withValues(alpha: 0.7);
 
     return Expanded(
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeInOut,
           alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 2),
           decoration: BoxDecoration(
-            color: isSelected
-                ? (isDark ? const Color(0xFF1E293B) : Colors.white)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
+            color: isSelected ? activeBg : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            border: isSelected ? Border.all(color: activeBorder, width: 1) : null,
             boxShadow: isSelected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.08),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
+                      color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
+                      blurRadius: 5,
+                      offset: const Offset(0, 1.5),
                     ),
                   ]
                 : null,
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 11.5,
-              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-              color: isSelected ? textPrimary : AppColors.textSecondaryOf(context),
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                  color: isSelected
+                      ? (isDark ? const Color(0xFF38BDF8) : AppColors.primary)
+                      : textSecondary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              if (count != null) ...[
+                const SizedBox(width: 4.5),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? (isDark
+                            ? const Color(0xFF38BDF8).withValues(alpha: 0.18)
+                            : AppColors.primary.withValues(alpha: 0.12))
+                        : (isDark
+                            ? Colors.white.withValues(alpha: 0.06)
+                            : Colors.black.withValues(alpha: 0.05)),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$count',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: isSelected
+                          ? (isDark ? const Color(0xFF38BDF8) : AppColors.primary)
+                          : textSecondary.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),

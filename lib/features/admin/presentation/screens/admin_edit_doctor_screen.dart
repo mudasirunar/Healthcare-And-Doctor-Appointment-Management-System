@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
@@ -80,35 +81,49 @@ class _AdminEditDoctorScreenState extends ConsumerState<AdminEditDoctorScreen> {
 
     try {
       await ref.read(doctorRepositoryProvider).updateDoctorProfile(updated);
+      if (d.userId.isNotEmpty) {
+        try {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(d.userId)
+              .update({'displayName': updated.doctorName});
+        } catch (_) {}
+      }
       ref.invalidate(allDoctorsAdminProvider);
       ref.invalidate(filteredDoctorsProvider);
 
-      // Notify the doctor about key changes
+      // Always notify the doctor when hospital administration updates their profile
+      final changes = <String>[];
       if (_selectedSpecialtyId != d.specialtyId) {
-        UserNotificationService.instance.sendDoctorNotification(
-          doctorUserId: d.userId,
-          title: 'Specialty Department Reassigned',
-          body:
-              'Hospital administration reassigned your specialty to $_selectedSpecialtyName.',
-          type: 'specialty_reassigned',
-        );
-      } else if (fee != d.consultationFee) {
-        UserNotificationService.instance.sendDoctorNotification(
-          doctorUserId: d.userId,
-          title: 'Consultation Fee Updated',
-          body:
-              'Hospital administration adjusted your fee benchmark to \$${fee.toStringAsFixed(0)}.',
-          type: 'fee_updated',
-        );
-      } else if (_verificationStatus != d.verificationStatus) {
-        UserNotificationService.instance.sendDoctorNotification(
-          doctorUserId: d.userId,
-          title: 'Credential Status Updated',
-          body:
-              'Your credential status has been updated to ${_verificationStatus.displayName}.',
-          type: 'verification_updated',
-        );
+        changes.add('Specialty changed to $_selectedSpecialtyName');
       }
+      if (fee != d.consultationFee) {
+        changes.add('Fee set to \$${fee.toStringAsFixed(0)}');
+      }
+      if (_verificationStatus != d.verificationStatus) {
+        changes.add(
+            'Verification status updated to ${_verificationStatus.displayName}');
+      }
+      if (_slotDurationMinutes != d.slotDurationMinutes) {
+        changes.add('Slot duration changed to $_slotDurationMinutes mins');
+      }
+      if (_nameCtrl.text.trim() != d.doctorName) {
+        changes.add('Display name updated');
+      }
+
+      final summary = changes.isNotEmpty
+          ? changes.join(' • ')
+          : 'Profile and demographic information updated.';
+
+      UserNotificationService.instance.sendDoctorNotification(
+        doctorUserId: d.userId,
+        doctorId: d.id,
+        title: 'Profile Updated by Administration',
+        body:
+            'Hospital administration updated your specialist profile: $summary',
+        type: 'doctor_profile_updated',
+        targetId: d.id,
+      );
 
       if (mounted) {
         AppSnackBar.showSuccess(

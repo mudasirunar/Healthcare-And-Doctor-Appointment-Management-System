@@ -63,6 +63,7 @@ class DoctorModel {
   final List<String> blackoutDates; // "2026-11-05"
   final int slotDurationMinutes;
   final String? avatarUrl;
+  final String createdAt;
 
   const DoctorModel({
     required this.id,
@@ -84,6 +85,7 @@ class DoctorModel {
     this.blackoutDates = const [],
     this.slotDurationMinutes = 30,
     this.avatarUrl,
+    this.createdAt = '2026-11-01T08:00:00.000Z',
   });
 
   bool get isVerified => verificationStatus == VerificationStatus.approved;
@@ -108,6 +110,7 @@ class DoctorModel {
     List<String>? blackoutDates,
     int? slotDurationMinutes,
     String? avatarUrl,
+    String? createdAt,
   }) {
     return DoctorModel(
       id: id ?? this.id,
@@ -129,6 +132,7 @@ class DoctorModel {
       blackoutDates: blackoutDates ?? this.blackoutDates,
       slotDurationMinutes: slotDurationMinutes ?? this.slotDurationMinutes,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 
@@ -155,6 +159,7 @@ class DoctorModel {
       'blackoutDates': blackoutDates,
       'slotDurationMinutes': slotDurationMinutes,
       'avatarUrl': avatarUrl,
+      'createdAt': createdAt,
     };
   }
 
@@ -189,6 +194,7 @@ class DoctorModel {
       blackoutDates: List<String>.from(map['blackoutDates'] as List? ?? []),
       slotDurationMinutes: (map['slotDurationMinutes'] as num?)?.toInt() ?? 30,
       avatarUrl: map['avatarUrl'] as String?,
+      createdAt: map['createdAt'] as String? ?? '2026-11-01T08:00:00.000Z',
     );
   }
 }

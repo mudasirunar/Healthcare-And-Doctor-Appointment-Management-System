@@ -192,6 +192,16 @@ class _BookingScreenState extends ConsumerState<BookingScreen> {
         targetId: apt.id,
       );
 
+      // Notify doctor of new consultation request
+      UserNotificationService.instance.sendDoctorNotification(
+        doctorUserId: doctor.userId.isNotEmpty ? doctor.userId : doctor.id,
+        doctorId: doctor.id,
+        title: 'New Consultation Request',
+        body: '${user.displayName} requested an appointment for ${DateTimeUtils.formatFullWithTimeZone(_selectedSlotUtc!.toIso8601String())}.',
+        type: 'appointment_requested',
+        targetId: apt.id,
+      );
+
       ref.invalidate(userAppointmentsProvider);
 
       if (mounted) {

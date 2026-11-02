@@ -87,7 +87,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
     final doctorRepo = ref.watch(doctorRepositoryProvider);
     final currentIndex = ref.watch(doctorSelectedTabProvider);
     final appointmentsAsync = ref.watch(userAppointmentsProvider);
-    final unreadNotifs = ref.watch(unreadPatientNotificationsCountProvider);
+    final unreadNotifs = ref.watch(unreadDoctorNotificationsCountProvider);
     final unreadChats = ref.watch(unreadConversationsCountProvider);
 
     final pendingRequestsCount = appointmentsAsync.value
@@ -215,6 +215,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
     final surfaceColor = AppColors.surfaceOf(context);
     final borderColor = AppColors.borderOf(context);
     final currentUser = ref.watch(currentUserProvider);
+    final doctorRecord = ref.watch(currentDoctorRecordStreamProvider).valueOrNull;
 
     final chatButton = _ChatIconButtonWithBadge(
       unreadCount: unreadChatsCount,
@@ -245,9 +246,11 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
                     : null,
                 child: currentUser?.avatarUrl == null
                     ? Text(
-                        currentUser != null && currentUser.displayName.isNotEmpty
-                            ? currentUser.displayName[0].toUpperCase()
-                            : 'D',
+                        doctorRecord != null && doctorRecord.doctorName.isNotEmpty
+                            ? doctorRecord.doctorName.replaceFirst(RegExp(r'^Dr\.\s*'), '')[0].toUpperCase()
+                            : (currentUser != null && currentUser.displayName.isNotEmpty
+                                ? currentUser.displayName[0].toUpperCase()
+                                : 'D'),
                         style: const TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -272,7 +275,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      currentUser?.displayName ?? 'Doctor',
+                      doctorRecord?.doctorName ?? currentUser?.displayName ?? 'Doctor',
                       style: AppTypography.headline.copyWith(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,

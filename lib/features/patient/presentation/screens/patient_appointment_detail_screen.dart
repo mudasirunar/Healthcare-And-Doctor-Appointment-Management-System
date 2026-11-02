@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
+import '../../../../core/services/user_notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
@@ -95,6 +96,23 @@ class PatientAppointmentDetailScreen extends ConsumerWidget {
                     cancellationReason: reason,
                   );
               ref.invalidate(userAppointmentsProvider);
+
+              // Notify doctor and patient
+              UserNotificationService.instance.sendDoctorNotification(
+                doctorUserId: apt.doctorId,
+                doctorId: apt.doctorId,
+                title: 'Consultation Cancelled by Patient',
+                body: '${apt.patientName} cancelled the session for ${DateTimeUtils.formatFullWithTimeZone(apt.scheduledTimeUtc)}.\nReason: "$reason"',
+                type: 'appointment_cancelled',
+                targetId: apt.id,
+              );
+              UserNotificationService.instance.sendPatientNotification(
+                patientUserId: apt.patientId,
+                title: 'Consultation Cancelled',
+                body: 'Your consultation with ${apt.doctorName} was cancelled.',
+                type: 'appointment_cancelled',
+                targetId: apt.id,
+              );
 
               if (ctx.mounted) {
                 Navigator.pop(ctx);

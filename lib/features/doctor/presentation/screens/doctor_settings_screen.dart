@@ -68,10 +68,15 @@ class _DoctorSettingsScreenState extends ConsumerState<DoctorSettingsScreen> {
         ? ((completedVisits.length / totalResolved) * 100).toStringAsFixed(0)
         : '100';
 
+    final liveDoctor = ref.watch(currentDoctorRecordStreamProvider).valueOrNull;
+
     return FutureBuilder<DoctorModel?>(
-      future: user != null ? doctorRepo.getDoctorByUserId(user.id) : null,
+      future: liveDoctor != null
+          ? Future.value(liveDoctor)
+          : (user != null ? doctorRepo.getDoctorByUserId(user.id) : null),
+      initialData: liveDoctor,
       builder: (context, snapshot) {
-        final doctor = snapshot.data;
+        final doctor = snapshot.data ?? liveDoctor;
         final fee = doctor?.consultationFee ?? 50.0;
         final totalEarnings = completedVisits.length * fee;
 

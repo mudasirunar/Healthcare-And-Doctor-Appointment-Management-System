@@ -119,6 +119,15 @@ class PreferencesService {
     } catch (_) {}
   }
 
+  static final Map<String, String> _notificationTimestamps = {};
+
+  String getNotificationTimestamp(String notifId, [String? fallback]) {
+    return _notificationTimestamps.putIfAbsent(
+      notifId,
+      () => fallback ?? '2026-11-01T08:00:00.000Z',
+    );
+  }
+
   ThemeMode _parseThemeMode(String? raw) {
     switch (raw) {
       case 'light':

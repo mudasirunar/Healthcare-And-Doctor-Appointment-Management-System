@@ -177,14 +177,15 @@ class _DoctorPrescriptionScreenState
             'Doctor issued digital prescription ($rxId) and concluded consultation.',
       );
 
-      // 3. Dispatch patient notification
+      // 3. Dispatch patient notification with rxId target
       UserNotificationService.instance.sendPatientNotification(
         patientUserId: widget.appointment.patientId,
         title: 'Digital Prescription Issued',
         body:
             'Dr. ${widget.appointment.doctorName} has issued your official digital prescription.',
         type: 'prescription_issued',
-        targetId: widget.appointment.id,
+        targetId: rxId,
+        appointmentId: widget.appointment.id,
       );
 
       widget.onPrescriptionCreated?.call();
