@@ -8,7 +8,7 @@ import '../../../../core/utils/date_time_utils.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../auth/domain/entities/user_model.dart';
-import '../../../consultation/presentation/screens/prescription_builder_dialog.dart';
+import '../../../consultation/presentation/screens/doctor_prescription_screen.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
 import 'doctor_practice_insights_screen.dart';
@@ -43,13 +43,15 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
   }
 
   void _openPrescriptionBuilder(AppointmentModel apt) {
-    showDialog(
-      context: context,
-      builder: (ctx) => PrescriptionBuilderDialog(
-        appointment: apt,
-        onPrescriptionCreated: () {
-          ref.invalidate(userAppointmentsProvider);
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DoctorPrescriptionScreen(
+          appointment: apt,
+          onPrescriptionCreated: () {
+            ref.invalidate(userAppointmentsProvider);
+          },
+        ),
       ),
     );
   }

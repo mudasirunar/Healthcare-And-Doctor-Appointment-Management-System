@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/screens/role_dispatcher_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
@@ -21,9 +22,11 @@ import '../../features/admin/presentation/screens/admin_patient_detail_screen.da
 import '../../features/admin/presentation/screens/admin_appointment_detail_screen.dart';
 import '../../features/admin/presentation/screens/admin_specialties_screen.dart';
 import '../../features/admin/presentation/screens/admin_analytics_screen.dart';
+import '../../features/appointment/domain/entities/appointment_model.dart';
 import '../../features/consultation/presentation/screens/video_consultation_screen.dart';
 import '../../features/consultation/presentation/screens/appointment_chat_screen.dart';
 import '../../features/consultation/presentation/screens/prescription_viewer_screen.dart';
+import '../../features/consultation/presentation/screens/doctor_prescription_screen.dart';
 
 final appRouter = GoRouter(
   initialLocation: '/',
@@ -166,6 +169,18 @@ final appRouter = GoRouter(
       builder: (context, state) {
         final rxId = state.pathParameters['id'] ?? '';
         return PrescriptionViewerScreen(prescriptionId: rxId);
+      },
+    ),
+    GoRoute(
+      path: '/doctor/prescription',
+      builder: (context, state) {
+        final apt = state.extra as AppointmentModel?;
+        if (apt == null) {
+          return const Scaffold(
+            body: Center(child: Text('Appointment record required')),
+          );
+        }
+        return DoctorPrescriptionScreen(appointment: apt);
       },
     ),
   ],

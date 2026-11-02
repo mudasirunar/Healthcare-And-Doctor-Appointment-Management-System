@@ -42,14 +42,21 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
         .where((d) => d.userId == currentUser?.id || d.id == currentUser?.id)
         .firstOrNull;
     final currentDoctorId = doctorRecord?.id ?? currentUser?.id ?? '';
-    final isCurrentDoctor = isDoctor &&
-        (appointment != null) &&
-        (appointment.doctorId == currentDoctorId ||
-            appointment.doctorId == currentUser?.id ||
-            appointment.doctorName == currentUser?.displayName);
-    final isCurrentPatient = isPatient &&
-        (appointment != null) &&
-        (appointment.patientId == currentUser?.id);
+    final currentDisplayName = currentUser?.displayName;
+    final isCurrentDoctor = isDoctor ||
+        ((appointment != null) &&
+            (appointment.doctorId == currentDoctorId ||
+                appointment.doctorId == currentUser?.id ||
+                (currentDisplayName != null &&
+                    currentDisplayName.isNotEmpty &&
+                    appointment.doctorName
+                        .toLowerCase()
+                        .contains(currentDisplayName.toLowerCase()))));
+    final isCurrentPatient = isPatient ||
+        ((appointment != null) &&
+            (appointment.patientId == currentUser?.id ||
+                appointment.patientEmail.toLowerCase() ==
+                    (currentUser?.email ?? '').toLowerCase()));
 
     if (appointment == null) {
       return Scaffold(

@@ -117,13 +117,18 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final effectiveRole =
-        role ?? ref.watch(currentUserProvider)?.role ?? UserRole.admin;
-    final isAdmin = effectiveRole == UserRole.admin;
-    final isPatient = effectiveRole == UserRole.patient;
-    final isDoctor = effectiveRole == UserRole.doctor;
-
     final currentUser = ref.watch(currentUserProvider);
+    final isDoctor = (role == UserRole.doctor) ||
+        (currentUser?.role == UserRole.doctor) ||
+        (currentUser?.isDoctor == true);
+    final isPatient = (role == UserRole.patient) ||
+        (!isDoctor &&
+            (currentUser?.role == UserRole.patient ||
+                currentUser?.isPatient == true));
+    final isAdmin = !isDoctor && !isPatient;
+    final effectiveRole = isDoctor
+        ? UserRole.doctor
+        : (isPatient ? UserRole.patient : UserRole.admin);
     final doctorRecord = (ref.watch(verifiedDoctorsStreamProvider).valueOrNull ?? [])
         .where((d) => d.userId == currentUser?.id || d.id == currentUser?.id)
         .firstOrNull;
@@ -192,18 +197,33 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
           );
         }
 
+        final currentDocName = currentUser?.displayName;
         final patientAppointments = isDoctor
             ? allApts
                 .where((a) =>
                     a.patientId == patient.id &&
                     (a.doctorId == currentDoctorId ||
                         a.doctorId == currentUser?.id ||
-                        a.doctorId.isEmpty))
+                        (currentDocName != null &&
+                            currentDocName.isNotEmpty &&
+                            a.doctorName.toLowerCase().contains(
+                                currentDocName.toLowerCase()))))
                 .toList()
             : allApts.where((a) => a.patientId == patient.id).toList();
 
         final patientPrescriptions = isDoctor
-            ? doctorRx.where((r) => r.patientId == patient.id).toList()
+            ? (doctorRx.isNotEmpty
+                ? doctorRx.where((r) => r.patientId == patient.id).toList()
+                : allRx
+                    .where((r) =>
+                        r.patientId == patient.id &&
+                        (r.doctorId == currentDoctorId ||
+                            r.doctorId == currentUser?.id ||
+                            (currentDocName != null &&
+                                currentDocName.isNotEmpty &&
+                                r.doctorName.toLowerCase().contains(
+                                    currentDocName.toLowerCase()))))
+                    .toList())
             : (isAdmin
                 ? allRx.where((r) => r.patientId == patient.id).toList()
                 : patientRx);

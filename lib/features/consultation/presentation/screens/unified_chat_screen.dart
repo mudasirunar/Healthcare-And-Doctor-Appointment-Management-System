@@ -11,7 +11,7 @@ import '../../../auth/domain/entities/user_model.dart';
 import '../../../patient/presentation/screens/doctor_details_screen.dart';
 import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
 import '../../domain/entities/chat_message_model.dart';
-import 'prescription_builder_dialog.dart';
+import 'doctor_prescription_screen.dart';
 import 'prescription_viewer_screen.dart';
 
 /// Formats a medical department/specialty name into a specialist title
@@ -393,14 +393,15 @@ class _UnifiedChatScreenState extends ConsumerState<UnifiedChatScreen> {
                     color: AppColors.primary),
                 tooltip: 'Issue Prescription',
                 onPressed: () {
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (_) => PrescriptionBuilderDialog(
-                      appointment: apt,
-                      onPrescriptionCreated: () {
-                        ref.invalidate(userAppointmentsProvider);
-                      },
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => DoctorPrescriptionScreen(
+                        appointment: apt,
+                        onPrescriptionCreated: () {
+                          ref.invalidate(userAppointmentsProvider);
+                        },
+                      ),
                     ),
                   );
                 },

@@ -13,7 +13,7 @@ import '../../../../core/widgets/status_badge.dart';
 import '../../../admin/presentation/screens/admin_appointment_detail_screen.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../auth/domain/entities/user_model.dart';
-import '../../../consultation/presentation/screens/prescription_builder_dialog.dart';
+import '../../../consultation/presentation/screens/doctor_prescription_screen.dart';
 import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
 
 enum AgendaTabSegment { active, completed, all, cancelled }
@@ -241,14 +241,16 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
   }
 
   void _openPrescriptionBuilder(AppointmentModel apt) {
-    showDialog(
-      context: context,
-      builder: (ctx) => PrescriptionBuilderDialog(
-        appointment: apt,
-        onPrescriptionCreated: () {
-          ref.invalidate(userAppointmentsProvider);
-          ref.invalidate(allAppointmentsAdminProvider);
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => DoctorPrescriptionScreen(
+          appointment: apt,
+          onPrescriptionCreated: () {
+            ref.invalidate(userAppointmentsProvider);
+            ref.invalidate(allAppointmentsAdminProvider);
+          },
+        ),
       ),
     );
   }
@@ -529,12 +531,13 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
                         itemBuilder: (context, index) {
                           final apt = filtered[index];
 
-                          return Container(
-                            decoration: BoxDecoration(
-                              color: surfaceColor,
+                          return Material(
+                            color: surfaceColor,
+                            shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(14),
-                              border: Border.all(color: borderColor),
+                              side: BorderSide(color: borderColor),
                             ),
+                            clipBehavior: Clip.antiAlias,
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -713,158 +716,152 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
                                     horizontal: 10,
                                     vertical: 6,
                                   ),
-                                  child: SingleChildScrollView(
-                                    scrollDirection: Axis.horizontal,
-                                    physics: const BouncingScrollPhysics(),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        // View Full Appointment Details
-                                        TextButton.icon(
-                                          onPressed: () {
-                                            Navigator.push(
-                                              context,
-                                              MaterialPageRoute(
-                                                builder: (_) =>
-                                                    AdminAppointmentDetailScreen(
-                                                  appointmentId: apt.id,
-                                                ),
+                                  child: Row(
+                                    children: [
+                                      // View Full Appointment Details
+                                      TextButton.icon(
+                                        onPressed: () {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (_) =>
+                                                  AdminAppointmentDetailScreen(
+                                                appointmentId: apt.id,
                                               ),
-                                            );
-                                          },
-                                          icon: const Icon(
-                                            Icons.info_outline_rounded,
-                                            size: 15,
-                                          ),
-                                          label: const Text(
-                                            'Details',
-                                            style: TextStyle(fontSize: 12),
-                                          ),
-                                          style: TextButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
                                             ),
-                                            minimumSize: Size.zero,
-                                            tapTargetSize:
-                                                MaterialTapTargetSize.shrinkWrap,
-                                          ),
+                                          );
+                                        },
+                                        icon: const Icon(
+                                          Icons.info_outline_rounded,
+                                          size: 14,
                                         ),
-                                        const SizedBox(width: 4),
-
-                                        // Chat
-                                        TextButton.icon(
-                                          onPressed: () => context.push(
-                                            '/consultation/chat/${apt.id}',
+                                        label: const Text(
+                                          'Details',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 4,
                                           ),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 4),
+
+                                      // Chat
+                                      TextButton.icon(
+                                        onPressed: () => context.push(
+                                          '/consultation/chat/${apt.id}',
+                                        ),
+                                        icon: const Icon(
+                                          Icons.chat_bubble_outline_rounded,
+                                          size: 14,
+                                        ),
+                                        label: const Text(
+                                          'Chat',
+                                          style: TextStyle(fontSize: 12),
+                                        ),
+                                        style: TextButton.styleFrom(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 6,
+                                            vertical: 4,
+                                          ),
+                                          minimumSize: Size.zero,
+                                          tapTargetSize:
+                                              MaterialTapTargetSize.shrinkWrap,
+                                        ),
+                                      ),
+
+                                      const Spacer(),
+
+                                      // Prescribe (Emerald Green)
+                                      if (apt.status ==
+                                              AppointmentStatus.confirmed ||
+                                          apt.status ==
+                                              AppointmentStatus.inProgress ||
+                                          apt.status ==
+                                              AppointmentStatus.completed) ...[
+                                        ElevatedButton.icon(
+                                          onPressed: () =>
+                                              _openPrescriptionBuilder(apt),
                                           icon: const Icon(
-                                            Icons.chat_bubble_outline_rounded,
+                                            Icons.medication_outlined,
                                             size: 14,
                                           ),
                                           label: const Text(
-                                            'Chat',
-                                            style: TextStyle(fontSize: 12),
+                                            'Rx',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
-                                          style: TextButton.styleFrom(
-                                            padding: const EdgeInsets.symmetric(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor:
+                                                AppColors.secondary,
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            padding:
+                                                const EdgeInsets.symmetric(
                                               horizontal: 8,
-                                              vertical: 4,
+                                              vertical: 6,
                                             ),
                                             minimumSize: Size.zero,
                                             tapTargetSize:
                                                 MaterialTapTargetSize.shrinkWrap,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
                                           ),
                                         ),
-
-                                        const SizedBox(width: 14),
-
-                                        // Prescribe (Emerald Green)
-                                        if (apt.status ==
-                                                AppointmentStatus.confirmed ||
-                                            apt.status ==
-                                                AppointmentStatus.inProgress ||
-                                            apt.status ==
-                                                AppointmentStatus.completed) ...[
-                                          ElevatedButton.icon(
-                                            onPressed: () =>
-                                                _openPrescriptionBuilder(apt),
-                                            icon: const Icon(
-                                              Icons.medication_outlined,
-                                              size: 14,
-                                            ),
-                                            label: const Text(
-                                              'Rx',
-                                              style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor:
-                                                  AppColors.secondary,
-                                              foregroundColor: Colors.white,
-                                              elevation: 0,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                horizontal: 10,
-                                                vertical: 6,
-                                              ),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize:
-                                                  MaterialTapTargetSize.shrinkWrap,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                        ],
-
-                                        // Video Consultation Trigger (Call / Resume)
-                                        if (apt.status ==
-                                                AppointmentStatus.confirmed ||
-                                            apt.status ==
-                                                AppointmentStatus.inProgress) ...[
-                                          ElevatedButton.icon(
-                                            onPressed: () =>
-                                                _startConsultation(apt),
-                                            icon: const Icon(
-                                              Icons.videocam_rounded,
-                                              size: 15,
-                                            ),
-                                            label: Text(
-                                              apt.status ==
-                                                      AppointmentStatus.inProgress
-                                                  ? 'Resume'
-                                                  : 'Call',
-                                              style: const TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                            ),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.primary,
-                                              foregroundColor: Colors.white,
-                                              elevation: 0,
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                horizontal: 10,
-                                                vertical: 6,
-                                              ),
-                                              minimumSize: Size.zero,
-                                              tapTargetSize:
-                                                  MaterialTapTargetSize.shrinkWrap,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
+                                        const SizedBox(width: 6),
                                       ],
-                                    ),
+
+                                      // Video Consultation Trigger (Call / Resume)
+                                      if (apt.status ==
+                                              AppointmentStatus.confirmed ||
+                                          apt.status ==
+                                              AppointmentStatus.inProgress) ...[
+                                        ElevatedButton.icon(
+                                          onPressed: () =>
+                                              _startConsultation(apt),
+                                          icon: const Icon(
+                                            Icons.videocam_rounded,
+                                            size: 14,
+                                          ),
+                                          label: Text(
+                                            apt.status ==
+                                                    AppointmentStatus.inProgress
+                                                ? 'Resume'
+                                                : 'Call',
+                                            style: const TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primary,
+                                            foregroundColor: Colors.white,
+                                            elevation: 0,
+                                            padding:
+                                                const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 6,
+                                            ),
+                                            minimumSize: Size.zero,
+                                            tapTargetSize:
+                                                MaterialTapTargetSize.shrinkWrap,
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
                                   ),
                                 ),
                               ],
@@ -885,8 +882,13 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
         ),
       );
 
+    final wrappedContent = Material(
+      color: AppColors.backgroundOf(context),
+      child: content,
+    );
+
     if (!widget.isStandalone) {
-      return content;
+      return wrappedContent;
     }
 
     return Scaffold(
@@ -908,7 +910,7 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
           const SizedBox(width: 14),
         ],
       ),
-      body: content,
+      body: wrappedContent,
     );
   }
 }
