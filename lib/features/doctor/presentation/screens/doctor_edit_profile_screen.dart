@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 
-/// Professional profile editor for Doctors to manage fees, clinical bio, experience, and slot timings.
+/// Professional profile editor for Doctors to manage professional name, department,
+/// consultation fee, experience, slot duration, phone number, and clinical bio.
 class DoctorEditProfileScreen extends ConsumerStatefulWidget {
   final DoctorModel doctor;
 
@@ -25,8 +27,9 @@ class _DoctorEditProfileScreenState
   late final TextEditingController _expCtrl;
   late final TextEditingController _bioCtrl;
   late final TextEditingController _phoneCtrl;
-  late final TextEditingController _avatarCtrl;
 
+  late String _selectedSpecialtyId;
+  late String _selectedSpecialtyName;
   late int _slotDurationMinutes;
   bool _isSaving = false;
 
@@ -41,7 +44,9 @@ class _DoctorEditProfileScreenState
     _expCtrl = TextEditingController(text: d.experienceYears.toString());
     _bioCtrl = TextEditingController(text: d.bio);
     _phoneCtrl = TextEditingController(text: user?.phoneNumber ?? '');
-    _avatarCtrl = TextEditingController(text: d.avatarUrl ?? user?.avatarUrl ?? '');
+
+    _selectedSpecialtyId = d.specialtyId;
+    _selectedSpecialtyName = d.specialtyName;
     _slotDurationMinutes = d.slotDurationMinutes;
   }
 
@@ -52,7 +57,6 @@ class _DoctorEditProfileScreenState
     _expCtrl.dispose();
     _bioCtrl.dispose();
     _phoneCtrl.dispose();
-    _avatarCtrl.dispose();
     super.dispose();
   }
 
@@ -68,19 +72,19 @@ class _DoctorEditProfileScreenState
     final name = _nameCtrl.text.trim();
     final bio = _bioCtrl.text.trim();
     final phone = _phoneCtrl.text.trim();
-    final avatar = _avatarCtrl.text.trim().isNotEmpty ? _avatarCtrl.text.trim() : null;
 
     final updatedDoctor = d.copyWith(
       doctorName: name,
+      specialtyId: _selectedSpecialtyId,
+      specialtyName: _selectedSpecialtyName,
       consultationFee: fee,
       experienceYears: exp,
       slotDurationMinutes: _slotDurationMinutes,
       bio: bio,
-      avatarUrl: avatar,
     );
 
     try {
-      // 1. Update doctor entity in Firestore
+      // 1. Update doctor entity in Firestore live
       await ref.read(doctorRepositoryProvider).updateDoctorProfile(updatedDoctor);
 
       // 2. Update user profile record if name or phone changed
@@ -88,9 +92,9 @@ class _DoctorEditProfileScreenState
         final updatedUser = user.copyWith(
           displayName: name,
           phoneNumber: phone,
-          avatarUrl: avatar,
         );
         await ref.read(authRepositoryProvider).updateProfile(updatedUser);
+        ref.read(currentUserProvider.notifier).state = updatedUser;
       }
 
       ref.invalidate(allDoctorsAdminProvider);
@@ -102,7 +106,7 @@ class _DoctorEditProfileScreenState
           context,
           'Professional profile updated successfully!',
         );
-        Navigator.pop(context);
+        Navigator.pop(context, updatedDoctor);
       }
     } catch (e) {
       if (mounted) {
@@ -121,14 +125,21 @@ class _DoctorEditProfileScreenState
     final textSecondary = AppColors.textSecondaryOf(context);
     final surfaceColor = AppColors.surfaceOf(context);
     final borderColor = AppColors.borderOf(context);
+    final isDark = AppColors.isDark(context);
+    final user = ref.watch(currentUserProvider);
+    final specialties = ref.watch(specialtiesProvider).valueOrNull ?? [];
 
     return Scaffold(
       backgroundColor: AppColors.backgroundOf(context),
       appBar: AppBar(
-        title: const Text('Edit Professional Profile'),
+        title: const Text('Edit Profile'),
         backgroundColor: surfaceColor,
         elevation: 0,
         scrolledUnderElevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(height: 1, thickness: 1, color: borderColor),
+        ),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -151,56 +162,9 @@ class _DoctorEditProfileScreenState
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 36),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
           children: [
-            // Live Avatar Preview
-            Center(
-              child: Stack(
-                alignment: Alignment.bottomRight,
-                children: [
-                  ValueListenableBuilder<TextEditingValue>(
-                    valueListenable: _avatarCtrl,
-                    builder: (context, val, _) {
-                      final url = val.text.trim();
-                      final hasUrl = url.isNotEmpty && (url.startsWith('http://') || url.startsWith('https://'));
-
-                      return CircleAvatar(
-                        radius: 46,
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.12),
-                        backgroundImage: hasUrl ? NetworkImage(url) : null,
-                        child: !hasUrl
-                            ? Text(
-                                _nameCtrl.text.isNotEmpty
-                                    ? _nameCtrl.text
-                                        .replaceFirst(RegExp(r'^Dr\.\s*'), '')
-                                        .characters
-                                        .first
-                                        .toUpperCase()
-                                    : 'D',
-                                style: const TextStyle(
-                                  fontSize: 34,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.primary,
-                                ),
-                              )
-                            : null,
-                      );
-                    },
-                  ),
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Verified Credentials Section (Read-Only)
+            // Verified Credentials Section (Managed by Admin - Read-Only)
             Text(
               'Hospital Credentials (Managed by Admin)',
               style: TextStyle(
@@ -211,10 +175,10 @@ class _DoctorEditProfileScreenState
             ),
             const SizedBox(height: 8),
             Container(
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: surfaceColor,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: borderColor),
               ),
               child: Column(
@@ -222,27 +186,47 @@ class _DoctorEditProfileScreenState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Medical License', style: TextStyle(color: textSecondary, fontSize: 13)),
+                      Text(
+                        'Medical License',
+                        style: TextStyle(color: textSecondary, fontSize: 13),
+                      ),
                       Row(
                         children: [
-                          const Icon(Icons.verified, size: 14, color: AppColors.primary),
+                          const Icon(Icons.verified, size: 15, color: AppColors.primary),
                           const SizedBox(width: 4),
                           Text(
                             widget.doctor.licenseNumber,
-                            style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary),
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              color: textPrimary,
+                            ),
                           ),
                         ],
                       ),
                     ],
                   ),
-                  Divider(height: 18, color: borderColor),
+                  Divider(height: 20, color: borderColor),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Department', style: TextStyle(color: textSecondary, fontSize: 13)),
                       Text(
-                        widget.doctor.specialtyName,
-                        style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.primary),
+                        'Credential Status',
+                        style: TextStyle(color: textSecondary, fontSize: 13),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          widget.doctor.verificationStatus.displayName,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.success,
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -251,7 +235,7 @@ class _DoctorEditProfileScreenState
             ),
             const SizedBox(height: 24),
 
-            // Editable Profile Fields
+            // Editable Public Practice Profile
             Text(
               'Public Practice Profile',
               style: TextStyle(
@@ -260,9 +244,9 @@ class _DoctorEditProfileScreenState
                 color: textSecondary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
 
-            // Doctor Name
+            // 1. Doctor Full Professional Name
             TextFormField(
               controller: _nameCtrl,
               decoration: const InputDecoration(
@@ -271,10 +255,44 @@ class _DoctorEditProfileScreenState
               ),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? 'Please enter your professional name' : null,
+              onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 16),
 
-            // Fee & Experience Row
+            // 2. Department / Specialty Selector
+            if (specialties.isNotEmpty) ...[
+              DropdownButtonFormField<String>(
+                value: specialties.any((s) => s.id == _selectedSpecialtyId)
+                    ? _selectedSpecialtyId
+                    : (specialties.isNotEmpty ? specialties.first.id : null),
+                decoration: const InputDecoration(
+                  labelText: 'Medical Department / Specialty',
+                  prefixIcon: Icon(Icons.medical_services_outlined),
+                ),
+                dropdownColor: surfaceColor,
+                items: specialties.map((s) {
+                  return DropdownMenuItem(
+                    value: s.id,
+                    child: Text(
+                      s.name,
+                      style: TextStyle(color: textPrimary, fontSize: 14),
+                    ),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    final matched = specialties.firstWhere((s) => s.id == val);
+                    setState(() {
+                      _selectedSpecialtyId = matched.id;
+                      _selectedSpecialtyName = matched.name;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
+
+            // 3. Consultation Fee & Experience in Years Row
             Row(
               children: [
                 Expanded(
@@ -293,7 +311,7 @@ class _DoctorEditProfileScreenState
                     },
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: TextFormField(
                     controller: _expCtrl,
@@ -312,9 +330,9 @@ class _DoctorEditProfileScreenState
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-            // Slot Duration Selector
+            // 4. Consultation Slot Duration (Modern Rounded Pill Selector - No Ticks, No Overflow)
             Text(
               'Consultation Slot Duration',
               style: TextStyle(
@@ -323,64 +341,108 @@ class _DoctorEditProfileScreenState
                 color: textPrimary,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 2),
+            Text(
+              'Individual appointment duration for new patient bookings',
+              style: AppTypography.caption.copyWith(color: textSecondary),
+            ),
+            const SizedBox(height: 10),
             Row(
               children: [15, 30, 45, 60].map((mins) {
                 final isSelected = _slotDurationMinutes == mins;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text('$mins mins'),
-                    selected: isSelected,
-                    onSelected: (val) {
-                      if (val) setState(() => _slotDurationMinutes = mins);
-                    },
-                    selectedColor: AppColors.primary,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : textPrimary,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() => _slotDurationMinutes = mins);
+                      },
+                      borderRadius: BorderRadius.circular(10),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 160),
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? AppColors.primary
+                              : (isDark ? surfaceColor : Colors.white),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSelected ? AppColors.primary : borderColor,
+                            width: isSelected ? 1.5 : 1,
+                          ),
+                          boxShadow: isSelected
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.25),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Text(
+                          '$mins mins',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected ? Colors.white : textPrimary,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 );
               }).toList(),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-            // Phone Number
+            // 5. Contact Phone Number
             TextFormField(
               controller: _phoneCtrl,
               keyboardType: TextInputType.phone,
               decoration: const InputDecoration(
                 labelText: 'Contact Phone Number',
                 prefixIcon: Icon(Icons.phone_outlined),
+                hintText: '+1 (555) 000-0000',
               ),
             ),
             const SizedBox(height: 16),
 
-            // Avatar URL
-            TextFormField(
-              controller: _avatarCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Avatar Image URL',
-                prefixIcon: Icon(Icons.image_outlined),
-                hintText: 'https://example.com/photo.jpg',
+            // 6. Registered Professional Email (Read-only reference)
+            if (user?.email != null && user!.email.isNotEmpty) ...[
+              TextFormField(
+                initialValue: user.email,
+                readOnly: true,
+                decoration: InputDecoration(
+                  labelText: 'Registered Medical Email (Account)',
+                  prefixIcon: const Icon(Icons.email_outlined),
+                  suffixIcon: const Tooltip(
+                    message: 'Managed by Hospital Authentication',
+                    child: Icon(Icons.lock_outline_rounded, size: 18),
+                  ),
+                  filled: true,
+                  fillColor: surfaceColor.withValues(alpha: 0.5),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
+            ],
 
-            // Professional Bio
+            // 7. Professional Bio & Clinical Philosophy
             TextFormField(
               controller: _bioCtrl,
               maxLines: 4,
               decoration: const InputDecoration(
                 labelText: 'Professional Bio & Clinical Philosophy',
-                hintText: 'Describe your clinical training, areas of medical focus, and patient philosophy...',
+                hintText:
+                    'Describe your clinical training, areas of medical focus, and patient philosophy...',
                 alignLabelWithHint: true,
               ),
             ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 32),
 
-            // Save Button
+            // 8. Save Button
             SizedBox(
               height: 48,
               child: ElevatedButton(
@@ -389,17 +451,25 @@ class _DoctorEditProfileScreenState
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
                 child: _isSaving
                     ? const SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
                     : const Text(
-                        'Save Professional Profile',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                        'Save Profile',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
               ),
             ),
@@ -409,4 +479,3 @@ class _DoctorEditProfileScreenState
     );
   }
 }
-

@@ -244,13 +244,16 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
     final adminDoctorsList = isAdmin
         ? (ref.watch(allDoctorsAdminProvider).valueOrNull ?? [])
         : <DoctorModel>[];
-    final DoctorModel? preloadedAdminDoctor =
-        adminDoctorsList.where((d) => d.id == doctorId).firstOrNull;
+    final liveDoctor = (ref.watch(verifiedDoctorsStreamProvider).valueOrNull ?? [])
+        .where((d) => d.id == doctorId)
+        .firstOrNull;
+    final DoctorModel? preloadedDoctor =
+        adminDoctorsList.where((d) => d.id == doctorId).firstOrNull ?? liveDoctor;
 
     return FutureBuilder<DoctorModel?>(
-      initialData: preloadedAdminDoctor,
-      future: preloadedAdminDoctor != null
-          ? Future.value(preloadedAdminDoctor)
+      initialData: preloadedDoctor,
+      future: preloadedDoctor != null
+          ? Future.value(preloadedDoctor)
           : doctorRepo.getDoctorById(doctorId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
