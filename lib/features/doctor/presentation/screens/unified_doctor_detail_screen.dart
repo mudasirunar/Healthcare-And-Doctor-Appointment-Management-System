@@ -13,11 +13,14 @@ import '../../../admin/presentation/screens/admin_appointment_detail_screen.dart
 import '../../../admin/presentation/screens/admin_edit_doctor_screen.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../auth/domain/entities/user_model.dart';
+import '../../../consultation/domain/entities/prescription_model.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import 'doctor_edit_profile_screen.dart';
 import '../../../patient/presentation/screens/booking_screen.dart';
 import '../../../patient/presentation/screens/patient_appointment_detail_screen.dart';
+import '../../../patient/presentation/screens/patient_prescriptions_screen.dart';
+import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
 
 /// Unified Doctor Detail Screen reusable across Patient, Admin, and Doctor portals.
 class UnifiedDoctorDetailScreen extends ConsumerWidget {
@@ -310,7 +313,11 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
                 .where((a) => a.doctorId == doctor.id || a.doctorId == doctorId)
                 .toList()
               ..sort((a, b) => b.scheduledTimeUtc.compareTo(a.scheduledTimeUtc));
-            doctorPrescriptions = [];
+            final rxList = ref
+                    .watch(doctorPrescriptionsStreamProvider(doctor.id))
+                    .valueOrNull ??
+                [];
+            doctorPrescriptions = rxList;
           } else {
             // Colleague doctor: Cannot view colleague's private patient records
             doctorAppointments = [];
@@ -325,6 +332,15 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
             ..sort((a, b) => b.scheduledTimeUtc.compareTo(a.scheduledTimeUtc));
           doctorPrescriptions = [];
         }
+
+        final Map<String, AppointmentModel> uniquePatientsMap = {};
+        for (final a in doctorAppointments) {
+          if (a.patientId.isNotEmpty &&
+              !uniquePatientsMap.containsKey(a.patientId)) {
+            uniquePatientsMap[a.patientId] = a;
+          }
+        }
+        final myPatients = uniquePatientsMap.values.toList();
 
         final completedVisits = doctorAppointments
             .where((a) => a.status == AppointmentStatus.completed)
@@ -722,7 +738,7 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
                           ),
                         );
                       }),
-                    if (isAdmin || isPatient) ...[
+                    if (isAdmin || isPatient || isSelf) ...[
                       const SizedBox(height: 8),
                       Divider(height: 1, color: borderColor),
                     ],
@@ -874,13 +890,13 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
                                         width: 42,
                                         height: 42,
                                         decoration: BoxDecoration(
-                                          color: AppColors.primary
+                                          color: AppColors.secondary
                                               .withValues(alpha: 0.12),
                                           shape: BoxShape.circle,
                                         ),
                                         child: const Icon(
                                           Icons.description_outlined,
-                                          color: AppColors.primary,
+                                          color: AppColors.secondary,
                                           size: 20,
                                         ),
                                       ),
@@ -1014,15 +1030,19 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
                                         width: 40,
                                         height: 40,
                                         decoration: BoxDecoration(
-                                          color: AppColors.primary
-                                              .withValues(alpha: 0.1),
+                                          color: (hasRx
+                                                  ? AppColors.secondary
+                                                  : AppColors.primary)
+                                              .withValues(alpha: 0.12),
                                           shape: BoxShape.circle,
                                         ),
                                         child: Icon(
                                           hasRx
                                               ? Icons.medication_outlined
                                               : Icons.event_available_outlined,
-                                          color: AppColors.primary,
+                                          color: hasRx
+                                              ? AppColors.secondary
+                                              : AppColors.primary,
                                           size: 20,
                                         ),
                                       ),
@@ -1130,6 +1150,434 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
                           );
                         }),
                       const SizedBox(height: 24),
+                    ] else if (isSelf) ...[
+                      // 5. Doctor's Own Appointments Section
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'My Appointments (${doctorAppointments.length})',
+                              style: AppTypography.headline.copyWith(
+                                fontSize: 16,
+                                color: textPrimary,
+                              ),
+                            ),
+                            if (doctorAppointments.isNotEmpty)
+                              Text(
+                                '${completedVisits.length} Completed',
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (doctorAppointments.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
+                          child: Text(
+                            'No appointments recorded in your practice yet.',
+                            style: AppTypography.bodyMedium
+                                .copyWith(color: textSecondary),
+                          ),
+                        )
+                      else
+                        ...doctorAppointments.take(8).map((apt) {
+                          return Column(
+                            children: [
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => AdminAppointmentDetailScreen(
+                                        appointmentId: apt.id,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 14,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 21,
+                                        backgroundColor: AppColors.primary
+                                            .withValues(alpha: 0.12),
+                                        child: Text(
+                                          apt.patientName.isNotEmpty
+                                              ? apt.patientName[0].toUpperCase()
+                                              : 'P',
+                                          style: const TextStyle(
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              apt.patientName,
+                                              style: AppTypography.bodyLarge
+                                                  .copyWith(
+                                                fontWeight: FontWeight.w600,
+                                                color: textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              '${DateTimeUtils.formatLocalDate(apt.scheduledTimeUtc)} • ${DateTimeUtils.formatLocalTime(apt.scheduledTimeUtc)} • ${apt.reasonForVisit.isNotEmpty ? apt.reasonForVisit : "Consultation"}',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: AppTypography.caption
+                                                  .copyWith(
+                                                color: textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      StatusBadge(status: apt.status),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Divider(
+                                height: 1,
+                                indent: 76,
+                                endIndent: 20,
+                                color: borderColor,
+                              ),
+                            ],
+                          );
+                        }),
+
+                      const SizedBox(height: 12),
+                      Divider(height: 1, color: borderColor),
+
+                      // 6. Doctor's Own Patients Section
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                        child: Text(
+                          'My Patients (${myPatients.length})',
+                          style: AppTypography.headline.copyWith(
+                            fontSize: 16,
+                            color: textPrimary,
+                          ),
+                        ),
+                      ),
+                      if (myPatients.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
+                          child: Text(
+                            'No registered patients under your care yet.',
+                            style: AppTypography.bodyMedium
+                                .copyWith(color: textSecondary),
+                          ),
+                        )
+                      else
+                        ...myPatients.take(8).map((apt) {
+                          return Column(
+                            children: [
+                              InkWell(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => UnifiedPatientDetailScreen(
+                                        patientId: apt.patientId,
+                                        role: UserRole.doctor,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 14,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 21,
+                                        backgroundColor: AppColors.primary
+                                            .withValues(alpha: 0.12),
+                                        child: Text(
+                                          apt.patientName.isNotEmpty
+                                              ? apt.patientName[0].toUpperCase()
+                                              : 'P',
+                                          style: const TextStyle(
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              apt.patientName,
+                                              style: AppTypography.bodyLarge
+                                                  .copyWith(
+                                                fontWeight: FontWeight.w600,
+                                                color: textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              apt.patientEmail.isNotEmpty
+                                                  ? apt.patientEmail
+                                                  : (apt.reasonForVisit.isNotEmpty
+                                                      ? 'Reason: ${apt.reasonForVisit}'
+                                                      : 'Registered Patient'),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: AppTypography.caption
+                                                  .copyWith(
+                                                color: textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: textSecondary,
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Divider(
+                                height: 1,
+                                indent: 76,
+                                endIndent: 20,
+                                color: borderColor,
+                              ),
+                            ],
+                          );
+                        }),
+
+                      const SizedBox(height: 12),
+                      Divider(height: 1, color: borderColor),
+
+                      // 7. Doctor's Prescriptions Issued Section
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'Prescriptions Issued (${doctorPrescriptions.length})',
+                              style: AppTypography.headline.copyWith(
+                                fontSize: 16,
+                                color: textPrimary,
+                              ),
+                            ),
+                            if (doctorPrescriptions.isNotEmpty)
+                              TextButton.icon(
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const PatientPrescriptionsScreen(
+                                        isStandalone: true,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                icon: const Icon(Icons.arrow_forward_rounded,
+                                    size: 14),
+                                label: const Text('View All',
+                                    style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.w700)),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (doctorPrescriptions.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 20, vertical: 12),
+                          child: Text(
+                            'No digital prescriptions issued yet.',
+                            style: AppTypography.bodyMedium
+                                .copyWith(color: textSecondary),
+                          ),
+                        )
+                      else
+                        ...doctorPrescriptions.take(8).map((rx) {
+                          final p = rx is PrescriptionModel ? rx : null;
+                          final patientName = p?.patientName ?? 'Patient';
+                          final diagnosis = p?.diagnosis ?? '';
+                          final medsCount = p?.medications.length ?? 0;
+                          final issuedAt = p?.issuedAtUtc ?? '';
+                          final rxId = p?.id ?? '';
+
+                          return Column(
+                            children: [
+                              InkWell(
+                                onTap: () {
+                                  if (rxId.isNotEmpty) {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (_) =>
+                                            PrescriptionViewerScreen(
+                                          prescriptionId: rxId,
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                },
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 20,
+                                    vertical: 14,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Container(
+                                        width: 44,
+                                        height: 44,
+                                        decoration: BoxDecoration(
+                                          color: AppColors.secondary
+                                              .withValues(alpha: 0.12),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.description_outlined,
+                                          color: AppColors.secondary,
+                                          size: 22,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 14),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment
+                                                      .spaceBetween,
+                                              children: [
+                                                Expanded(
+                                                  child: Text(
+                                                    patientName,
+                                                    maxLines: 1,
+                                                    overflow:
+                                                        TextOverflow.ellipsis,
+                                                    style: AppTypography
+                                                        .bodyLarge
+                                                        .copyWith(
+                                                      fontWeight:
+                                                          FontWeight.w600,
+                                                      color: textPrimary,
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 8),
+                                                Container(
+                                                  padding:
+                                                      const EdgeInsets
+                                                          .symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 3,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.secondary
+                                                        .withValues(
+                                                            alpha: 0.12),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            8),
+                                                  ),
+                                                  child: Text(
+                                                    '$medsCount Meds',
+                                                    style: AppTypography
+                                                        .caption
+                                                        .copyWith(
+                                                      color:
+                                                          AppColors.secondary,
+                                                      fontWeight:
+                                                          FontWeight.w700,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 3),
+                                            if (diagnosis.isNotEmpty)
+                                              Text(
+                                                diagnosis,
+                                                maxLines: 1,
+                                                overflow:
+                                                    TextOverflow.ellipsis,
+                                                style: AppTypography.caption
+                                                    .copyWith(
+                                                  color: textSecondary,
+                                                ),
+                                              ),
+                                            if (issuedAt.isNotEmpty) ...[
+                                              const SizedBox(height: 3),
+                                              Text(
+                                                DateTimeUtils
+                                                    .formatFullWithTimeZone(
+                                                        issuedAt),
+                                                style: AppTypography.caption
+                                                    .copyWith(
+                                                  color: textSecondary
+                                                      .withValues(alpha: 0.8),
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Icon(
+                                        Icons.chevron_right_rounded,
+                                        color: textSecondary,
+                                        size: 20,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                              Divider(
+                                height: 1,
+                                indent: 76,
+                                endIndent: 20,
+                                color: borderColor,
+                              ),
+                            ],
+                          );
+                        }),
+                      const SizedBox(height: 28),
                     ],
                   ],
                 ),

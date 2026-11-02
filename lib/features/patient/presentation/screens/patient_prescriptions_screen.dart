@@ -140,12 +140,12 @@ class _PatientPrescriptionsScreenState
                             width: 46,
                             height: 46,
                             decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.12),
+                              color: AppColors.secondary.withValues(alpha: 0.12),
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(
                               Icons.description_outlined,
-                              color: AppColors.primary,
+                              color: AppColors.secondary,
                               size: 22,
                             ),
                           ),
@@ -176,14 +176,14 @@ class _PatientPrescriptionsScreenState
                                         vertical: 3,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.primary
+                                        color: AppColors.secondary
                                             .withValues(alpha: 0.12),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
                                         '${rx.medications.length} Meds',
                                         style: AppTypography.caption.copyWith(
-                                          color: AppColors.primary,
+                                          color: AppColors.secondary,
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),

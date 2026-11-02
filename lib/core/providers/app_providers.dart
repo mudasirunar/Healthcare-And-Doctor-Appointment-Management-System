@@ -490,6 +490,24 @@ final allPrescriptionsAdminProvider = StreamProvider<List<PrescriptionModel>>((r
       });
 });
 
+final doctorPrescriptionsStreamProvider =
+    StreamProvider.family<List<PrescriptionModel>, String>((ref, doctorId) {
+  return FirebaseFirestore.instance
+      .collection('prescriptions')
+      .where('doctorId', isEqualTo: doctorId)
+      .snapshots()
+      .handleError((e) {
+        debugPrint('doctorPrescriptionsStreamProvider error: $e');
+      })
+      .map((s) {
+        final list = s.docs
+            .map((d) => PrescriptionModel.fromMap(d.data(), id: d.id))
+            .toList();
+        list.sort((a, b) => b.issuedAtUtc.compareTo(a.issuedAtUtc));
+        return list;
+      });
+});
+
 final pendingDoctorsProvider = StreamProvider<List<DoctorModel>>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null || !user.isAdmin) return Stream.value(<DoctorModel>[]);

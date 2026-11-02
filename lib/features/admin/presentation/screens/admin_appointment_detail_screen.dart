@@ -353,12 +353,12 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                       width: 44,
                       height: 44,
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.12),
+                        color: AppColors.secondary.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.description_outlined,
-                        color: AppColors.primary,
+                        color: AppColors.secondary,
                         size: 20,
                       ),
                     ),

@@ -12,10 +12,10 @@ import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../admin/presentation/screens/admin_appointment_detail_screen.dart';
 import '../../../admin/presentation/screens/admin_doctor_detail_screen.dart';
-import 'doctor_details_screen.dart';
 import 'patient_appointment_detail_screen.dart';
 import 'unified_edit_patient_screen.dart';
 import '../../../auth/domain/entities/user_model.dart';
+import '../../../consultation/domain/entities/prescription_model.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
 
 /// Unified Patient Profile Screen reusable across Admin and Doctor portals.
@@ -121,6 +121,13 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
         role ?? ref.watch(currentUserProvider)?.role ?? UserRole.admin;
     final isAdmin = effectiveRole == UserRole.admin;
     final isPatient = effectiveRole == UserRole.patient;
+    final isDoctor = effectiveRole == UserRole.doctor;
+
+    final currentUser = ref.watch(currentUserProvider);
+    final doctorRecord = (ref.watch(verifiedDoctorsStreamProvider).valueOrNull ?? [])
+        .where((d) => d.userId == currentUser?.id || d.id == currentUser?.id)
+        .firstOrNull;
+    final currentDoctorId = doctorRecord?.id ?? currentUser?.id ?? '';
 
     final allPatients = ref.watch(allPatientsAdminProvider).valueOrNull ?? [];
     final allDocs = ref.watch(allDoctorsAdminProvider).valueOrNull ?? [];
@@ -128,13 +135,15 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
         ? (ref.watch(allAppointmentsAdminProvider).valueOrNull ?? [])
         : (ref.watch(userAppointmentsProvider).valueOrNull ?? []);
     final allRx = ref.watch(allPrescriptionsAdminProvider).valueOrNull ?? [];
+    final doctorRx = isDoctor && currentDoctorId.isNotEmpty
+        ? (ref.watch(doctorPrescriptionsStreamProvider(currentDoctorId)).valueOrNull ?? [])
+        : <PrescriptionModel>[];
 
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
     final borderColor = AppColors.borderOf(context);
     final surfaceColor = AppColors.surfaceOf(context);
 
-    final currentUser = ref.watch(currentUserProvider);
     final preloadedPatient = (currentUser != null && currentUser.id == patientId)
         ? currentUser
         : allPatients.where((p) => p.id == patientId).firstOrNull;
@@ -180,10 +189,21 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
           );
         }
 
-        final patientAppointments =
-            allApts.where((a) => a.patientId == patient.id).toList();
-        final patientPrescriptions =
-            allRx.where((r) => r.patientId == patient.id).toList();
+        final patientAppointments = isDoctor
+            ? allApts
+                .where((a) =>
+                    a.patientId == patient.id &&
+                    (a.doctorId == currentDoctorId ||
+                        a.doctorId == currentUser?.id ||
+                        a.doctorId.isEmpty))
+                .toList()
+            : allApts.where((a) => a.patientId == patient.id).toList();
+
+        final patientPrescriptions = isDoctor
+            ? doctorRx.where((r) => r.patientId == patient.id).toList()
+            : (isAdmin
+                ? allRx.where((r) => r.patientId == patient.id).toList()
+                : <PrescriptionModel>[]);
 
         final consultedDoctorIds =
             patientAppointments.map((a) => a.doctorId).toSet();
@@ -425,105 +445,108 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
               const SizedBox(height: 10),
               Divider(height: 1, color: borderColor),
 
-              // 3. Consulted Doctors
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
-                child: Text(
-                  'Consulted Specialists (${consultedDoctors.length})',
-                  style: AppTypography.headline.copyWith(color: textPrimary),
-                ),
-              ),
-              if (consultedDoctors.isEmpty)
+              // 3. Consulted Doctors (Admin only - hidden for Doctor)
+              if (isAdmin) ...[
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
                   child: Text(
-                    'No specialists consulted yet.',
-                    style:
-                        AppTypography.bodyMedium.copyWith(color: textSecondary),
+                    'Consulted Specialists (${consultedDoctors.length})',
+                    style: AppTypography.headline.copyWith(color: textPrimary),
                   ),
-                )
-              else
-                ...consultedDoctors.map((doc) {
-                  return Column(
-                    children: [
-                      InkWell(
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => isAdmin
-                                  ? AdminDoctorDetailScreen(doctorId: doc.id)
-                                  : DoctorDetailsScreen(doctorId: doc.id),
+                ),
+                if (consultedDoctors.isEmpty)
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    child: Text(
+                      'No specialists consulted yet.',
+                      style:
+                          AppTypography.bodyMedium.copyWith(color: textSecondary),
+                    ),
+                  )
+                else
+                  ...consultedDoctors.map((doc) {
+                    return Column(
+                      children: [
+                        InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    AdminDoctorDetailScreen(doctorId: doc.id),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 13,
                             ),
-                          );
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 13,
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 42,
-                                height: 42,
-                                decoration: BoxDecoration(
-                                  color:
-                                      AppColors.primary.withValues(alpha: 0.12),
-                                  shape: BoxShape.circle,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 42,
+                                  height: 42,
+                                  decoration: BoxDecoration(
+                                    color:
+                                        AppColors.primary.withValues(alpha: 0.12),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.medical_services_rounded,
+                                    color: AppColors.primary,
+                                    size: 20,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.medical_services_rounded,
-                                  color: AppColors.primary,
-                                  size: 20,
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      doc.doctorName,
-                                      style: AppTypography.bodyLarge.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                        color: textPrimary,
+                                const SizedBox(width: 14),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        doc.doctorName,
+                                        style: AppTypography.bodyLarge.copyWith(
+                                          fontWeight: FontWeight.w600,
+                                          color: textPrimary,
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      '${doc.specialtyName} • ${doc.experienceYears} yrs experience',
-                                      style: AppTypography.caption.copyWith(
-                                        color: textSecondary,
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '${doc.specialtyName} • ${doc.experienceYears} yrs experience',
+                                        style: AppTypography.caption.copyWith(
+                                          color: textSecondary,
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                              Icon(
-                                Icons.chevron_right_rounded,
-                                color: textSecondary,
-                              ),
-                            ],
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: textSecondary,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      Divider(
-                        height: 1,
-                        indent: 76,
-                        endIndent: 20,
-                        color: borderColor,
-                      ),
-                    ],
-                  );
-                }),
+                        Divider(
+                          height: 1,
+                          indent: 76,
+                          endIndent: 20,
+                          color: borderColor,
+                        ),
+                      ],
+                    );
+                  }),
+              ],
 
               // 4. Appointments & Calls History
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
                 child: Text(
-                  'Appointments & Consultations (${patientAppointments.length})',
+                  isDoctor
+                      ? 'Consultation History (${patientAppointments.length})'
+                      : 'Appointments & Consultations (${patientAppointments.length})',
                   style: AppTypography.headline.copyWith(color: textPrimary),
                 ),
               ),
@@ -532,7 +555,9 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   child: Text(
-                    'No appointment history found for this patient.',
+                    isDoctor
+                        ? 'No consultation history with this patient yet.'
+                        : 'No appointment history found for this patient.',
                     style:
                         AppTypography.bodyMedium.copyWith(color: textSecondary),
                   ),
@@ -546,7 +571,7 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => isAdmin
+                              builder: (_) => isAdmin || isDoctor
                                   ? AdminAppointmentDetailScreen(
                                       appointmentId: apt.id,
                                     )
@@ -583,7 +608,11 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      '${apt.doctorName} (${apt.doctorSpecialty})',
+                                      isDoctor
+                                          ? (apt.reasonForVisit.isNotEmpty
+                                              ? apt.reasonForVisit
+                                              : 'Consultation')
+                                          : '${apt.doctorName} (${apt.doctorSpecialty})',
                                       style: AppTypography.bodyLarge.copyWith(
                                         fontWeight: FontWeight.w600,
                                         color: textPrimary,
@@ -591,7 +620,7 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      '${DateTimeUtils.formatLocalDate(apt.scheduledTimeUtc)} • ${DateTimeUtils.formatLocalTime(apt.scheduledTimeUtc)} • ${apt.reasonForVisit}',
+                                      '${DateTimeUtils.formatLocalDate(apt.scheduledTimeUtc)} • ${DateTimeUtils.formatLocalTime(apt.scheduledTimeUtc)}${!isDoctor && apt.reasonForVisit.isNotEmpty ? " • ${apt.reasonForVisit}" : ""}',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: AppTypography.caption.copyWith(
@@ -621,7 +650,9 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
                 child: Text(
-                  'Prescriptions & Medical Records (${patientPrescriptions.length})',
+                  isDoctor
+                      ? 'Prescriptions Prescribed (${patientPrescriptions.length})'
+                      : 'Prescriptions & Medical Records (${patientPrescriptions.length})',
                   style: AppTypography.headline.copyWith(color: textPrimary),
                 ),
               ),
@@ -630,7 +661,9 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   child: Text(
-                    'No prescriptions issued to this patient yet.',
+                    isDoctor
+                        ? 'No prescriptions prescribed to this patient by you yet.'
+                        : 'No prescriptions issued to this patient yet.',
                     style:
                         AppTypography.bodyMedium.copyWith(color: textSecondary),
                   ),
@@ -662,12 +695,12 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                                 height: 42,
                                 decoration: BoxDecoration(
                                   color:
-                                      AppColors.primary.withValues(alpha: 0.12),
+                                      AppColors.secondary.withValues(alpha: 0.12),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
                                   Icons.medication_outlined,
-                                  color: AppColors.primary,
+                                  color: AppColors.secondary,
                                   size: 20,
                                 ),
                               ),
