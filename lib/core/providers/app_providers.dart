@@ -143,12 +143,15 @@ final unreadDoctorNotificationsCountProvider = Provider<int>((ref) {
 final adminSelectedTabProvider = StateProvider<int>((ref) => 0);
 final patientSelectedTabProvider = StateProvider<int>((ref) => 0);
 final doctorSelectedTabProvider = StateProvider<int>((ref) => 0);
+/// Filter chip selection for Doctor Agenda ('all', 'today', 'confirmed', 'inProgress', 'completed', 'cancelled')
+final doctorAgendaFilterProvider = StateProvider<String?>((ref) => null);
 
 /// Central sign-out routine: clears auth, resets all tab indices to 0, and invalidates stream providers
 Future<void> appSignOut(WidgetRef ref) async {
   ref.read(adminSelectedTabProvider.notifier).state = 0;
   ref.read(patientSelectedTabProvider.notifier).state = 0;
   ref.read(doctorSelectedTabProvider.notifier).state = 0;
+  ref.read(doctorAgendaFilterProvider.notifier).state = null;
   ref.read(currentUserProvider.notifier).state = null;
   NotificationService.instance.stopListening();
 

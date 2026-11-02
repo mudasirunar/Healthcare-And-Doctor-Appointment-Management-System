@@ -45,7 +45,6 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
   late final ScrollController _internalScrollController;
 
   String _searchQuery = '';
-  String? _selectedFilterChip; // e.g. 'all', 'today', 'confirmed', 'inProgress', 'completed', 'cancelled'
   AgendaSortMode _sortMode = AgendaSortMode.timeAscending;
 
   @override
@@ -280,6 +279,7 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
   Widget build(BuildContext context) {
     final appointmentsAsync = ref.watch(userAppointmentsProvider);
     final unreadChats = ref.watch(unreadConversationsCountProvider);
+    final selectedFilterChip = ref.watch(doctorAgendaFilterProvider);
 
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
@@ -317,22 +317,22 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
 
           // Filter by selected filter chip
           List<AppointmentModel> baseList = allAppointments;
-          if (_selectedFilterChip != null && _selectedFilterChip != 'all') {
+          if (selectedFilterChip != null && selectedFilterChip != 'all') {
             baseList = baseList.where((a) {
-              if (_selectedFilterChip == 'today') {
+              if (selectedFilterChip == 'today') {
                 try {
                   final d = DateTime.parse(a.scheduledTimeUtc).toLocal();
                   return d.year == now.year && d.month == now.month && d.day == now.day;
                 } catch (_) {
                   return false;
                 }
-              } else if (_selectedFilterChip == 'confirmed') {
+              } else if (selectedFilterChip == 'confirmed') {
                 return a.status == AppointmentStatus.confirmed;
-              } else if (_selectedFilterChip == 'inProgress') {
+              } else if (selectedFilterChip == 'inProgress') {
                 return a.status == AppointmentStatus.inProgress;
-              } else if (_selectedFilterChip == 'completed') {
+              } else if (selectedFilterChip == 'completed') {
                 return a.status == AppointmentStatus.completed;
-              } else if (_selectedFilterChip == 'cancelled') {
+              } else if (selectedFilterChip == 'cancelled') {
                 return a.status == AppointmentStatus.cancelled ||
                     a.status == AppointmentStatus.rejected;
               }
@@ -423,50 +423,50 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
 
               // 2. Category Filter Chips (Single Unified AutoCenterFilterBar)
               AutoCenterFilterBar(
-                focusItemId: _selectedFilterChip ?? 'all',
+                focusItemId: selectedFilterChip ?? 'all',
                 items: [
                   AutoCenterFilterItem(
                     id: 'all',
                     label: allAppointments.isNotEmpty
                         ? 'All (${allAppointments.length})'
                         : 'All',
-                    isSelected: _selectedFilterChip == null || _selectedFilterChip == 'all',
-                    onTap: () => setState(() => _selectedFilterChip = null),
+                    isSelected: selectedFilterChip == null || selectedFilterChip == 'all',
+                    onTap: () => ref.read(doctorAgendaFilterProvider.notifier).state = null,
                   ),
                   AutoCenterFilterItem(
                     id: 'today',
                     label: 'Today ($todayCount)',
-                    isSelected: _selectedFilterChip == 'today',
-                    onTap: () => setState(() =>
-                        _selectedFilterChip = _selectedFilterChip == 'today' ? null : 'today'),
+                    isSelected: selectedFilterChip == 'today',
+                    onTap: () => ref.read(doctorAgendaFilterProvider.notifier).state =
+                        selectedFilterChip == 'today' ? null : 'today',
                   ),
                   AutoCenterFilterItem(
                     id: 'confirmed',
                     label: 'Confirmed ($confirmedCount)',
-                    isSelected: _selectedFilterChip == 'confirmed',
-                    onTap: () => setState(() => _selectedFilterChip =
-                        _selectedFilterChip == 'confirmed' ? null : 'confirmed'),
+                    isSelected: selectedFilterChip == 'confirmed',
+                    onTap: () => ref.read(doctorAgendaFilterProvider.notifier).state =
+                        selectedFilterChip == 'confirmed' ? null : 'confirmed',
                   ),
                   AutoCenterFilterItem(
                     id: 'inProgress',
                     label: 'In Progress ($inProgressCount)',
-                    isSelected: _selectedFilterChip == 'inProgress',
-                    onTap: () => setState(() => _selectedFilterChip =
-                        _selectedFilterChip == 'inProgress' ? null : 'inProgress'),
+                    isSelected: selectedFilterChip == 'inProgress',
+                    onTap: () => ref.read(doctorAgendaFilterProvider.notifier).state =
+                        selectedFilterChip == 'inProgress' ? null : 'inProgress',
                   ),
                   AutoCenterFilterItem(
                     id: 'completed',
                     label: 'Done ($completedCount)',
-                    isSelected: _selectedFilterChip == 'completed',
-                    onTap: () => setState(() => _selectedFilterChip =
-                        _selectedFilterChip == 'completed' ? null : 'completed'),
+                    isSelected: selectedFilterChip == 'completed',
+                    onTap: () => ref.read(doctorAgendaFilterProvider.notifier).state =
+                        selectedFilterChip == 'completed' ? null : 'completed',
                   ),
                   AutoCenterFilterItem(
                     id: 'cancelled',
                     label: 'Cancelled ($cancelledCount)',
-                    isSelected: _selectedFilterChip == 'cancelled',
-                    onTap: () => setState(() => _selectedFilterChip =
-                        _selectedFilterChip == 'cancelled' ? null : 'cancelled'),
+                    isSelected: selectedFilterChip == 'cancelled',
+                    onTap: () => ref.read(doctorAgendaFilterProvider.notifier).state =
+                        selectedFilterChip == 'cancelled' ? null : 'cancelled',
                   ),
                 ],
               ),
@@ -487,7 +487,7 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
                             icon: Icons.event_available_rounded,
                             title: _searchQuery.isNotEmpty
                                 ? 'No Consultations Found'
-                                : 'No ${_filterLabel(_selectedFilterChip)} Consultations',
+                                : 'No ${_filterLabel(selectedFilterChip)} Consultations',
                             description: _searchQuery.isNotEmpty
                                 ? 'No appointments match "$_searchQuery". Try clearing your search term or adjusting filters.'
                                 : 'There are currently no consultation records under this section.',

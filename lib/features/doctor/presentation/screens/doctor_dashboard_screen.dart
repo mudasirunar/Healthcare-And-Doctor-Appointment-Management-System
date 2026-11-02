@@ -145,6 +145,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   subtitle: 'Scheduled visits',
                   icon: Icons.calendar_today_rounded,
                   onTap: () {
+                    ref.read(doctorAgendaFilterProvider.notifier).state = 'today';
                     ref.read(doctorSelectedTabProvider.notifier).state = 1;
                   },
                 ),
@@ -169,6 +170,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   subtitle: 'Past consultations',
                   icon: Icons.check_circle_outline_rounded,
                   onTap: () {
+                    ref.read(doctorAgendaFilterProvider.notifier).state = 'completed';
                     ref.read(doctorSelectedTabProvider.notifier).state = 1;
                   },
                 ),
@@ -613,6 +615,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   ),
                   TextButton.icon(
                     onPressed: () {
+                      ref.read(doctorAgendaFilterProvider.notifier).state = null;
                       ref.read(doctorSelectedTabProvider.notifier).state = 1;
                     },
                     icon: const Icon(Icons.arrow_forward_rounded, size: 14),
@@ -634,6 +637,7 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
             GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: () {
+                ref.read(doctorAgendaFilterProvider.notifier).state = null;
                 ref.read(doctorSelectedTabProvider.notifier).state = 1;
               },
               child: Padding(
