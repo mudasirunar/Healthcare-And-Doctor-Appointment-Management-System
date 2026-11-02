@@ -5,9 +5,7 @@ import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
-import '../../../../core/utils/smart_search_utils.dart';
 import '../../../../core/widgets/app_dialog.dart';
-import '../../../../core/widgets/app_search_bar.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
@@ -15,6 +13,7 @@ import '../../../auth/domain/entities/user_model.dart';
 import '../../../consultation/presentation/screens/prescription_builder_dialog.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
+import 'doctor_agenda_screen.dart';
 import 'doctor_practice_insights_screen.dart';
 import 'unified_specialties_screen.dart';
 import 'unified_specialty_doctors_screen.dart';
@@ -30,15 +29,6 @@ class DoctorDashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
-  final TextEditingController _searchCtrl = TextEditingController();
-  String _query = '';
-  String _selectedFilter = 'Active'; // 'All' | 'Active' | 'Completed'
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
 
   void _showNotesDialog(AppointmentModel apt) {
     final notesController =
@@ -163,27 +153,11 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
         .firstOrNull;
 
     final heroAppointment = inProgressVisit ?? nextUpcomingVisit;
-
-    // Filter agenda by tab and query
-    final filteredByTab = allAppointments.where((a) {
-      if (_selectedFilter == 'Active') {
-        return a.status == AppointmentStatus.confirmed ||
-            a.status == AppointmentStatus.inProgress;
-      } else if (_selectedFilter == 'Completed') {
-        return a.status == AppointmentStatus.completed;
-      }
-      return true; // 'All'
-    }).toList();
-
-    final filteredAppointments =
-        SmartSearchEngine.filterAndSort<AppointmentModel>(
-      items: filteredByTab,
-      query: _query,
-      primaryTextBuilder: (a) => a.patientName,
-      secondaryTextsBuilder: (a) => [a.patientEmail, a.reasonForVisit],
-      fallbackComparator: (a, b) =>
-          b.scheduledTimeUtc.compareTo(a.scheduledTimeUtc),
-    );
+    final activeAppointments = allAppointments
+        .where((a) =>
+            a.status == AppointmentStatus.confirmed ||
+            a.status == AppointmentStatus.inProgress)
+        .toList();
 
     // My Patients unique list
     final Map<String, AppointmentModel> uniquePatientsMap = {};
@@ -217,11 +191,12 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   subtitle: 'Scheduled visits',
                   icon: Icons.calendar_today_rounded,
                   onTap: () {
-                    setState(() {
-                      _selectedFilter = 'Active';
-                      _query = '';
-                      _searchCtrl.clear();
-                    });
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DoctorAgendaScreen(),
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(width: 12),
@@ -245,11 +220,12 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   subtitle: 'Past consultations',
                   icon: Icons.check_circle_outline_rounded,
                   onTap: () {
-                    setState(() {
-                      _selectedFilter = 'Completed';
-                      _query = '';
-                      _searchCtrl.clear();
-                    });
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DoctorAgendaScreen(),
+                      ),
+                    );
                   },
                 ),
                 const SizedBox(width: 12),
@@ -259,11 +235,12 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                   subtitle: 'Earned consultations',
                   icon: Icons.attach_money_rounded,
                   onTap: () {
-                    setState(() {
-                      _selectedFilter = 'Completed';
-                      _query = '';
-                      _searchCtrl.clear();
-                    });
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const DoctorPracticeInsightsScreen(),
+                      ),
+                    );
                   },
                 ),
               ],
@@ -627,180 +604,265 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
               const SizedBox(height: 20),
             ],
 
-            // 4. Consultation Agenda & Timeline
-            Text(
-              'Consultation Agenda',
-              style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.w700,
-                color: textPrimary,
-              ),
-            ),
-            const SizedBox(height: 8),
-
-            // Search Bar
-            AppSearchBar(
-              controller: _searchCtrl,
-              hintText: 'Search agenda by patient or reason...',
-              onChanged: (val) => setState(() => _query = val),
-              onClear: () => setState(() => _query = ''),
-            ),
-            const SizedBox(height: 10),
-
-            // Filter Chips
-            Row(
-              children: ['Active', 'Completed', 'All'].map((f) {
-                final isSelected = _selectedFilter == f;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(f),
-                    selected: isSelected,
-                    onSelected: (val) {
-                      if (val) setState(() => _selectedFilter = f);
-                    },
-                    selectedColor: AppColors.primary,
-                    labelStyle: TextStyle(
-                      color: isSelected ? Colors.white : textPrimary,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                      fontSize: 12.5,
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-
-            // Agenda List
-            if (filteredAppointments.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24),
-                child: Center(
-                  child: Text(
-                    _query.isNotEmpty
-                        ? 'No appointments match "$_query".'
-                        : 'No consultations found under "$_selectedFilter".',
-                    style: TextStyle(color: textSecondary, fontSize: 13),
-                  ),
-                ),
-              )
-            else
-              ...filteredAppointments.map((apt) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: surfaceColor,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: borderColor),
-                  ),
-                  child: Column(
+            // 4. Consultation Agenda Access & Shortcut (Flat On-Screen Design)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 18,
-                                backgroundColor:
-                                    AppColors.primary.withValues(alpha: 0.12),
-                                child: Text(
-                                  apt.patientName.isNotEmpty
-                                      ? apt.patientName[0].toUpperCase()
-                                      : 'P',
-                                  style: const TextStyle(
-                                    color: AppColors.primary,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    apt.patientName,
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w700,
-                                      color: textPrimary,
-                                    ),
-                                  ),
-                                  Text(
-                                    DateTimeUtils.formatFullWithTimeZone(
-                                        apt.scheduledTimeUtc),
-                                    style: TextStyle(
-                                      fontSize: 11.5,
-                                      fontWeight: FontWeight.w500,
-                                      color: textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                          Text(
+                            'Consultation Agenda',
+                            style: AppTypography.headline.copyWith(
+                              fontSize: 17,
+                              color: textPrimary,
+                            ),
                           ),
-                          StatusBadge(status: apt.status),
-                        ],
-                      ),
-                      if (apt.reasonForVisit.isNotEmpty) ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Reason: "${apt.reasonForVisit}"',
-                          style: TextStyle(fontSize: 12.5, color: textSecondary),
-                        ),
-                      ],
-                      const SizedBox(height: 10),
-                      Divider(height: 1, color: borderColor),
-                      const SizedBox(height: 8),
-
-                      // Action bar
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton.icon(
-                            onPressed: () => _showNotesDialog(apt),
-                            icon: const Icon(Icons.edit_note_rounded, size: 16),
-                            label: const Text('Notes', style: TextStyle(fontSize: 12.5)),
-                          ),
-                          const SizedBox(width: 4),
-                          TextButton.icon(
-                            onPressed: () =>
-                                context.push('/consultation/chat/${apt.id}'),
-                            icon: const Icon(Icons.chat_bubble_outline_rounded, size: 15),
-                            label: const Text('Chat', style: TextStyle(fontSize: 12.5)),
-                          ),
-                          if (apt.status == AppointmentStatus.confirmed ||
-                              apt.status == AppointmentStatus.inProgress) ...[
-                            const SizedBox(width: 4),
-                            ElevatedButton.icon(
-                              onPressed: () => _startConsultation(apt),
-                              icon: const Icon(Icons.videocam_rounded, size: 15),
-                              label: Text(
-                                apt.status == AppointmentStatus.inProgress
-                                    ? 'Resume'
-                                    : 'Call',
-                                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                          if (activeAppointments.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
                               ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '${activeAppointments.length} Active',
+                                style: const TextStyle(
+                                  color: AppColors.primary,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ),
                           ],
                         ],
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Scheduled sessions, timeline & clinical queue',
+                        style: AppTypography.caption.copyWith(color: textSecondary),
+                      ),
                     ],
                   ),
+                  TextButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DoctorAgendaScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.arrow_forward_rounded, size: 14),
+                    label: const Text('View All'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      textStyle: const TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // Flat Consultation Agenda Card / Next Session Preview
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DoctorAgendaScreen(),
+                  ),
                 );
-              }),
+              },
+              borderRadius: BorderRadius.circular(14),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: surfaceColor,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: borderColor),
+                ),
+                child: heroAppointment != null
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  CircleAvatar(
+                                    radius: 19,
+                                    backgroundColor:
+                                        AppColors.primary.withValues(alpha: 0.12),
+                                    child: Text(
+                                      heroAppointment.patientName.isNotEmpty
+                                          ? heroAppointment.patientName[0].toUpperCase()
+                                          : 'P',
+                                      style: const TextStyle(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        heroAppointment.patientName,
+                                        style: TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: textPrimary,
+                                        ),
+                                      ),
+                                      Text(
+                                        DateTimeUtils.formatFullWithTimeZone(
+                                            heroAppointment.scheduledTimeUtc),
+                                        style: TextStyle(
+                                          fontSize: 11.5,
+                                          fontWeight: FontWeight.w500,
+                                          color: textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                              StatusBadge(status: heroAppointment.status),
+                            ],
+                          ),
+                          if (heroAppointment.reasonForVisit.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Text(
+                              'Reason: "${heroAppointment.reasonForVisit}"',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                color: textSecondary,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 12),
+                          Divider(height: 1, color: borderColor),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.access_time_rounded,
+                                    size: 14,
+                                    color: textSecondary,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${heroAppointment.durationMinutes} mins • ${heroAppointment.displayRoomName}',
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Open Agenda',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Icon(
+                                    Icons.arrow_forward_rounded,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      )
+                    : Row(
+                        children: [
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.event_available_rounded,
+                              color: AppColors.primary,
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Schedule Up to Date',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  'No urgent consultations pending right now',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Row(
+                            children: [
+                              Text(
+                                'Open Agenda',
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.arrow_forward_rounded,
+                                size: 14,
+                                color: AppColors.primary,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+              ),
+            ),
 
             const SizedBox(height: 22),
 
