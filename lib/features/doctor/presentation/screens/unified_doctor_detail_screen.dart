@@ -264,8 +264,10 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
     final liveDoctor = (ref.watch(verifiedDoctorsStreamProvider).valueOrNull ?? [])
         .where((d) => d.id == doctorId)
         .firstOrNull;
-    final DoctorModel? preloadedDoctor =
-        adminDoctorsList.where((d) => d.id == doctorId).firstOrNull ?? liveDoctor;
+    final streamDoctor = ref.watch(singleDoctorStreamProvider(doctorId)).valueOrNull;
+    final DoctorModel? preloadedDoctor = streamDoctor ??
+        adminDoctorsList.where((d) => d.id == doctorId).firstOrNull ??
+        liveDoctor;
 
     return FutureBuilder<DoctorModel?>(
       initialData: preloadedDoctor,
@@ -274,7 +276,8 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
           : doctorRepo.getDoctorById(doctorId),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
-            snapshot.data == null) {
+            snapshot.data == null &&
+            preloadedDoctor == null) {
           return Scaffold(
             backgroundColor: AppColors.backgroundOf(context),
             appBar: AppBar(
@@ -289,7 +292,7 @@ class UnifiedDoctorDetailScreen extends ConsumerWidget {
           );
         }
 
-        final doctor = snapshot.data;
+        final doctor = streamDoctor ?? preloadedDoctor ?? snapshot.data;
         if (doctor == null) {
           return Scaffold(
             backgroundColor: AppColors.backgroundOf(context),

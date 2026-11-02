@@ -152,9 +152,10 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
     final borderColor = AppColors.borderOf(context);
     final surfaceColor = AppColors.surfaceOf(context);
 
+    final streamPatient = ref.watch(singlePatientStreamProvider(patientId)).valueOrNull;
     final preloadedPatient = (currentUser != null && currentUser.id == patientId)
         ? currentUser
-        : allPatients.where((p) => p.id == patientId).firstOrNull;
+        : (streamPatient ?? allPatients.where((p) => p.id == patientId).firstOrNull);
 
     return FutureBuilder<UserModel?>(
       initialData: preloadedPatient,
@@ -163,7 +164,8 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
           : _fetchPatient(ref),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting &&
-            snapshot.data == null) {
+            snapshot.data == null &&
+            preloadedPatient == null) {
           return Scaffold(
             backgroundColor: AppColors.backgroundOf(context),
             appBar: AppBar(
@@ -178,7 +180,7 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
           );
         }
 
-        final patient = snapshot.data;
+        final patient = streamPatient ?? preloadedPatient ?? snapshot.data;
         if (patient == null) {
           return Scaffold(
             backgroundColor: AppColors.backgroundOf(context),

@@ -419,6 +419,42 @@ final currentUserProvider = StateProvider<UserModel?>((ref) {
   return authUser;
 });
 
+/// Live real-time stream of an individual patient's user document.
+final singlePatientStreamProvider =
+    StreamProvider.family<UserModel?, String>((ref, patientId) {
+  if (patientId.isEmpty) return Stream.value(null);
+  try {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(patientId)
+        .snapshots()
+        .map((doc) => doc.exists && doc.data() != null
+            ? UserModel.fromMap(doc.data()!, id: doc.id)
+            : null);
+  } catch (e) {
+    debugPrint('singlePatientStreamProvider error: $e');
+    return Stream.value(null);
+  }
+});
+
+/// Live real-time stream of an individual doctor document.
+final singleDoctorStreamProvider =
+    StreamProvider.family<DoctorModel?, String>((ref, doctorId) {
+  if (doctorId.isEmpty) return Stream.value(null);
+  try {
+    return FirebaseFirestore.instance
+        .collection('doctors')
+        .doc(doctorId)
+        .snapshots()
+        .map((doc) => doc.exists && doc.data() != null
+            ? DoctorModel.fromMap(doc.data()!, id: doc.id)
+            : null);
+  } catch (e) {
+    debugPrint('singleDoctorStreamProvider error: $e');
+    return Stream.value(null);
+  }
+});
+
 // --- DOCTORS & SPECIALTIES (REAL-TIME STREAMS) ---
 final specialtiesProvider = StreamProvider<List<SpecialtyModel>>((ref) {
   return FirebaseFirestore.instance

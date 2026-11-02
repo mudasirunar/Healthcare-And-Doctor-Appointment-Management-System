@@ -16,8 +16,6 @@ import '../../../auth/domain/entities/user_model.dart';
 import '../../../consultation/presentation/screens/doctor_prescription_screen.dart';
 import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
 
-enum AgendaTabSegment { all, active, completed, cancelled }
-
 enum AgendaSortMode {
   timeAscending,
   timeDescending,
@@ -26,7 +24,7 @@ enum AgendaSortMode {
 }
 
 /// Comprehensive Consultation Agenda Screen for Doctors.
-/// Features segmented tabs, auto-centering filter chips, smart search,
+/// Features smart search, auto-centering filter chips with live workload counts,
 /// and flat on-screen consultation items with complete clinical actions.
 class DoctorAgendaScreen extends ConsumerStatefulWidget {
   final ScrollController? scrollController;
@@ -47,8 +45,7 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
   late final ScrollController _internalScrollController;
 
   String _searchQuery = '';
-  AgendaTabSegment _selectedSegment = AgendaTabSegment.all;
-  String? _selectedFilterChip; // e.g. 'today', 'confirmed', 'inProgress', null
+  String? _selectedFilterChip; // e.g. 'all', 'today', 'confirmed', 'inProgress', 'completed', 'cancelled'
   AgendaSortMode _sortMode = AgendaSortMode.timeAscending;
 
   @override
@@ -72,6 +69,17 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
       AgendaSortMode.timeDescending => 'Scheduled Time (Latest First)',
       AgendaSortMode.patientAlphabetical => 'Patient Name (A–Z)',
       AgendaSortMode.longestDuration => 'Duration (Longest First)',
+    };
+  }
+
+  String _filterLabel(String? chipId) {
+    return switch (chipId) {
+      'today' => 'Today\'s',
+      'confirmed' => 'Confirmed',
+      'inProgress' => 'In-Progress',
+      'completed' => 'Completed',
+      'cancelled' => 'Cancelled',
+      _ => 'Scheduled',
     };
   }
 
@@ -282,28 +290,35 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
         data: (allAppointments) {
           final now = DateTime.now();
 
-          // Segment partition counts
-          final activeList = allAppointments.where((a) =>
-              a.status == AppointmentStatus.confirmed ||
-              a.status == AppointmentStatus.inProgress).toList();
-          final completedList = allAppointments
+          // Workload counts for the filter chips
+          final todayCount = allAppointments.where((a) {
+            try {
+              final d = DateTime.parse(a.scheduledTimeUtc).toLocal();
+              return d.year == now.year && d.month == now.month && d.day == now.day;
+            } catch (_) {
+              return false;
+            }
+          }).length;
+
+          final confirmedCount = allAppointments
+              .where((a) => a.status == AppointmentStatus.confirmed)
+              .length;
+          final inProgressCount = allAppointments
+              .where((a) => a.status == AppointmentStatus.inProgress)
+              .length;
+          final completedCount = allAppointments
               .where((a) => a.status == AppointmentStatus.completed)
-              .toList();
-          final cancelledList = allAppointments.where((a) =>
-              a.status == AppointmentStatus.cancelled ||
-              a.status == AppointmentStatus.rejected).toList();
+              .length;
+          final cancelledCount = allAppointments
+              .where((a) =>
+                  a.status == AppointmentStatus.cancelled ||
+                  a.status == AppointmentStatus.rejected)
+              .length;
 
-          // Filter by active segment tab
-          List<AppointmentModel> segmentAppointments = switch (_selectedSegment) {
-            AgendaTabSegment.all => allAppointments,
-            AgendaTabSegment.active => activeList,
-            AgendaTabSegment.completed => completedList,
-            AgendaTabSegment.cancelled => cancelledList,
-          };
-
-          // Filter by AutoCenterFilterChip if selected
-          if (_selectedFilterChip != null) {
-            segmentAppointments = segmentAppointments.where((a) {
+          // Filter by selected filter chip
+          List<AppointmentModel> baseList = allAppointments;
+          if (_selectedFilterChip != null && _selectedFilterChip != 'all') {
+            baseList = baseList.where((a) {
               if (_selectedFilterChip == 'today') {
                 try {
                   final d = DateTime.parse(a.scheduledTimeUtc).toLocal();
@@ -327,7 +342,7 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
 
           // Smart Search & Sort
           final filtered = SmartSearchEngine.filterAndSort<AppointmentModel>(
-            items: segmentAppointments,
+            items: baseList,
             query: _searchQuery,
             primaryTextBuilder: (a) => a.patientName,
             secondaryTextsBuilder: (a) => [
@@ -341,165 +356,114 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
 
           return Column(
             children: [
-              // 1. Top Segmented Switcher (Active | Completed | All | Cancelled)
+              // 1. Search Bar + Sort Trigger Button
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-                child: Column(
+                child: Row(
                   children: [
-                    Container(
-                      height: 44,
-                      padding: const EdgeInsets.all(3.5),
-                      decoration: BoxDecoration(
-                        color: AppColors.surfaceVariantOf(context),
-                        borderRadius: BorderRadius.circular(13),
-                        border: Border.all(color: borderColor),
-                      ),
-                      child: Row(
-                        children: [
-                          _SegmentButton(
-                            label: 'All',
-                            count: allAppointments.length,
-                            isSelected: _selectedSegment == AgendaTabSegment.all,
-                            onTap: () => setState(
-                              () => _selectedSegment = AgendaTabSegment.all,
-                            ),
-                          ),
-                          _SegmentButton(
-                            label: 'Active',
-                            count: activeList.length,
-                            isSelected: _selectedSegment == AgendaTabSegment.active,
-                            onTap: () => setState(
-                              () => _selectedSegment = AgendaTabSegment.active,
-                            ),
-                          ),
-                          _SegmentButton(
-                            label: 'Done',
-                            count: completedList.length,
-                            isSelected: _selectedSegment == AgendaTabSegment.completed,
-                            onTap: () => setState(
-                              () => _selectedSegment = AgendaTabSegment.completed,
-                            ),
-                          ),
-                          _SegmentButton(
-                            label: 'Other',
-                            count: cancelledList.length,
-                            isSelected: _selectedSegment == AgendaTabSegment.cancelled,
-                            onTap: () => setState(
-                              () => _selectedSegment = AgendaTabSegment.cancelled,
-                            ),
-                          ),
-                        ],
+                    Expanded(
+                      child: AppSearchBar(
+                        controller: _searchController,
+                        hintText: 'Search patient, reason, room, or Rx...',
+                        onChanged: (val) => setState(() => _searchQuery = val),
+                        onClear: () => setState(() => _searchQuery = ''),
                       ),
                     ),
-                    const SizedBox(height: 10),
-
-                    // 2. Search Bar + Sort Trigger Button
-                    Row(
-                      children: [
-                        Expanded(
-                          child: AppSearchBar(
-                            controller: _searchController,
-                            hintText: 'Search patient, reason, room, or Rx...',
-                            onChanged: (val) =>
-                                setState(() => _searchQuery = val),
-                            onClear: () => setState(() => _searchQuery = ''),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Tooltip(
-                          message: 'Sort Agenda: ${_sortLabel(_sortMode)}',
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => _showSortBottomSheet(context),
-                            child: Container(
-                              width: 46,
-                              height: 46,
-                              decoration: BoxDecoration(
-                                color: _sortMode != AgendaSortMode.timeAscending
-                                    ? AppColors.primary.withValues(alpha: 0.14)
-                                    : AppColors.surfaceVariantOf(context),
-                                borderRadius: BorderRadius.circular(14),
-                                border: Border.all(
-                                  color: _sortMode != AgendaSortMode.timeAscending
-                                      ? AppColors.primary
-                                      : borderColor,
-                                ),
-                              ),
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.tune_rounded,
-                                    size: 21,
-                                    color: _sortMode != AgendaSortMode.timeAscending
-                                        ? AppColors.primary
-                                        : textPrimary,
-                                  ),
-                                  if (_sortMode != AgendaSortMode.timeAscending)
-                                    Positioned(
-                                      top: 10,
-                                      right: 10,
-                                      child: Container(
-                                        width: 7,
-                                        height: 7,
-                                        decoration: const BoxDecoration(
-                                          color: AppColors.primary,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
+                    const SizedBox(width: 10),
+                    Tooltip(
+                      message: 'Sort Agenda: ${_sortLabel(_sortMode)}',
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _showSortBottomSheet(context),
+                        child: Container(
+                          width: 46,
+                          height: 46,
+                          decoration: BoxDecoration(
+                            color: _sortMode != AgendaSortMode.timeAscending
+                                ? AppColors.primary.withValues(alpha: 0.14)
+                                : AppColors.surfaceVariantOf(context),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: _sortMode != AgendaSortMode.timeAscending
+                                  ? AppColors.primary
+                                  : borderColor,
                             ),
                           ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              Icon(
+                                Icons.tune_rounded,
+                                size: 21,
+                                color: _sortMode != AgendaSortMode.timeAscending
+                                    ? AppColors.primary
+                                    : textPrimary,
+                              ),
+                              if (_sortMode != AgendaSortMode.timeAscending)
+                                Positioned(
+                                  top: 10,
+                                  right: 10,
+                                  child: Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.primary,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
               ),
 
-              // 3. Category Filter Chips (AutoCenterFilterBar)
+              // 2. Category Filter Chips (Single Unified AutoCenterFilterBar)
               AutoCenterFilterBar(
-                focusItemId: _selectedFilterChip ?? 'all_chip',
+                focusItemId: _selectedFilterChip ?? 'all',
                 items: [
                   AutoCenterFilterItem(
-                    id: 'all_chip',
-                    label: 'All Items',
-                    isSelected: _selectedFilterChip == null,
+                    id: 'all',
+                    label: allAppointments.isNotEmpty
+                        ? 'All (${allAppointments.length})'
+                        : 'All',
+                    isSelected: _selectedFilterChip == null || _selectedFilterChip == 'all',
                     onTap: () => setState(() => _selectedFilterChip = null),
                   ),
                   AutoCenterFilterItem(
                     id: 'today',
-                    label: 'Today',
+                    label: 'Today ($todayCount)',
                     isSelected: _selectedFilterChip == 'today',
-                    onTap: () => setState(() => _selectedFilterChip =
-                        _selectedFilterChip == 'today' ? null : 'today'),
+                    onTap: () => setState(() =>
+                        _selectedFilterChip = _selectedFilterChip == 'today' ? null : 'today'),
                   ),
                   AutoCenterFilterItem(
                     id: 'confirmed',
-                    label: 'Confirmed',
+                    label: 'Confirmed ($confirmedCount)',
                     isSelected: _selectedFilterChip == 'confirmed',
                     onTap: () => setState(() => _selectedFilterChip =
                         _selectedFilterChip == 'confirmed' ? null : 'confirmed'),
                   ),
                   AutoCenterFilterItem(
                     id: 'inProgress',
-                    label: 'In Progress',
+                    label: 'In Progress ($inProgressCount)',
                     isSelected: _selectedFilterChip == 'inProgress',
                     onTap: () => setState(() => _selectedFilterChip =
                         _selectedFilterChip == 'inProgress' ? null : 'inProgress'),
                   ),
                   AutoCenterFilterItem(
                     id: 'completed',
-                    label: 'Completed',
+                    label: 'Done ($completedCount)',
                     isSelected: _selectedFilterChip == 'completed',
                     onTap: () => setState(() => _selectedFilterChip =
                         _selectedFilterChip == 'completed' ? null : 'completed'),
                   ),
                   AutoCenterFilterItem(
                     id: 'cancelled',
-                    label: 'Cancelled',
+                    label: 'Cancelled ($cancelledCount)',
                     isSelected: _selectedFilterChip == 'cancelled',
                     onTap: () => setState(() => _selectedFilterChip =
                         _selectedFilterChip == 'cancelled' ? null : 'cancelled'),
@@ -509,7 +473,7 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
               const SizedBox(height: 6),
               Divider(height: 1, color: borderColor),
 
-              // 4. Agenda Consultation Items List
+              // 3. Agenda Consultation Items List
               Expanded(
                 child: filtered.isEmpty
                     ? Center(
@@ -523,7 +487,7 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
                             icon: Icons.event_available_rounded,
                             title: _searchQuery.isNotEmpty
                                 ? 'No Consultations Found'
-                                : 'No Consultations in ${_selectedSegment.name.toUpperCase()}',
+                                : 'No ${_filterLabel(_selectedFilterChip)} Consultations',
                             description: _searchQuery.isNotEmpty
                                 ? 'No appointments match "$_searchQuery". Try clearing your search term or adjusting filters.'
                                 : 'There are currently no consultation records under this section.',
@@ -921,100 +885,6 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
         ],
       ),
       body: wrappedContent,
-    );
-  }
-}
-
-class _SegmentButton extends StatelessWidget {
-  final String label;
-  final int? count;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _SegmentButton({
-    required this.label,
-    this.count,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final textSecondary = AppColors.textSecondaryOf(context);
-    final isDark = AppColors.isDark(context);
-    final activeBg = isDark ? const Color(0xFF1E293B) : Colors.white;
-    final activeBorder = isDark
-        ? AppColors.primary.withValues(alpha: 0.28)
-        : AppColors.borderOf(context).withValues(alpha: 0.7);
-
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeInOut,
-          alignment: Alignment.center,
-          padding: const EdgeInsets.symmetric(horizontal: 2),
-          decoration: BoxDecoration(
-            color: isSelected ? activeBg : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: isSelected ? Border.all(color: activeBorder, width: 1) : null,
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.06),
-                      blurRadius: 5,
-                      offset: const Offset(0, 1.5),
-                    ),
-                  ]
-                : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                  color: isSelected
-                      ? (isDark ? const Color(0xFF38BDF8) : AppColors.primary)
-                      : textSecondary,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              if (count != null) ...[
-                const SizedBox(width: 4.5),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                  decoration: BoxDecoration(
-                    color: isSelected
-                        ? (isDark
-                            ? const Color(0xFF38BDF8).withValues(alpha: 0.18)
-                            : AppColors.primary.withValues(alpha: 0.12))
-                        : (isDark
-                            ? Colors.white.withValues(alpha: 0.06)
-                            : Colors.black.withValues(alpha: 0.05)),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '$count',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: isSelected
-                          ? (isDark ? const Color(0xFF38BDF8) : AppColors.primary)
-                          : textSecondary.withValues(alpha: 0.8),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
