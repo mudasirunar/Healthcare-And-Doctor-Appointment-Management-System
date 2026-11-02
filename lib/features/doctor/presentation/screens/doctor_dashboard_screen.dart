@@ -286,62 +286,92 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                     Divider(height: 1, color: borderColor),
                     const SizedBox(height: 12),
 
-                    // Quick Action Buttons
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                    // Quick Action Buttons - 3 Buttons in One Row
+                    Row(
                       children: [
-                        ElevatedButton.icon(
-                          onPressed: () => _startConsultation(heroAppointment),
-                          icon: const Icon(Icons.videocam_rounded, size: 16),
-                          label: Text(
-                            heroAppointment.status == AppointmentStatus.inProgress
-                                ? 'Resume Video Call'
-                                : 'Start Video Call',
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            elevation: 0,
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _startConsultation(heroAppointment),
+                            icon: const Icon(Icons.videocam_rounded, size: 15),
+                            label: const Text(
+                              'Call',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              elevation: 0,
+                              minimumSize: Size.zero,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 9,
+                                horizontal: 6,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(9),
+                              ),
                             ),
                           ),
                         ),
-                        OutlinedButton.icon(
-                          onPressed: () => context.push(
-                              '/consultation/chat/${heroAppointment.id}'),
-                          icon: const Icon(Icons.chat_bubble_outline_rounded,
-                              size: 15),
-                          label: const Text('Chat'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: textPrimary,
-                            side: BorderSide(color: borderColor),
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => context.push(
+                                '/consultation/chat/${heroAppointment.id}'),
+                            icon: const Icon(
+                              Icons.chat_bubble_outline_rounded,
+                              size: 14,
+                            ),
+                            label: const Text(
+                              'Chat',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: textPrimary,
+                              side: BorderSide(color: borderColor),
+                              minimumSize: Size.zero,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 9,
+                                horizontal: 6,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(9),
+                              ),
                             ),
                           ),
                         ),
-                        OutlinedButton.icon(
-                          onPressed: () =>
-                              _openPrescriptionBuilder(heroAppointment),
-                          icon: const Icon(Icons.medication_outlined, size: 16),
-                          label: const Text('Prescribe'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: textPrimary,
-                            side: BorderSide(color: borderColor),
-                            minimumSize: Size.zero,
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 12, vertical: 8),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(9),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () =>
+                                _openPrescriptionBuilder(heroAppointment),
+                            icon: const Icon(
+                              Icons.medication_outlined,
+                              size: 15,
+                            ),
+                            label: const Text(
+                              'Prescribe',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12.5,
+                              ),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: textPrimary,
+                              side: BorderSide(color: borderColor),
+                              minimumSize: Size.zero,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 9,
+                                horizontal: 6,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(9),
+                              ),
                             ),
                           ),
                         ),

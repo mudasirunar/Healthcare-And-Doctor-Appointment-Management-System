@@ -832,12 +832,9 @@ class _DoctorAgendaScreenState extends ConsumerState<DoctorAgendaScreen> {
                                             Icons.videocam_rounded,
                                             size: 14,
                                           ),
-                                          label: Text(
-                                            apt.status ==
-                                                    AppointmentStatus.inProgress
-                                                ? 'Resume'
-                                                : 'Call',
-                                            style: const TextStyle(
+                                          label: const Text(
+                                            'Call',
+                                            style: TextStyle(
                                               fontSize: 12,
                                               fontWeight: FontWeight.w700,
                                             ),
