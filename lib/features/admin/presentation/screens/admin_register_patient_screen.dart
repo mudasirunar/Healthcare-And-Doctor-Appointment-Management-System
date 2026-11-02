@@ -206,31 +206,24 @@ class _AdminRegisterPatientScreenState
                   v == null || v.trim().isEmpty ? 'Full name is required.' : null,
             ),
             const SizedBox(height: 14),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _phoneCtrl,
-                    keyboardType: TextInputType.phone,
-                    decoration: const InputDecoration(
-                      labelText: 'Phone Number',
-                      prefixIcon: Icon(Icons.phone_outlined),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: TextFormField(
-                    controller: _dobCtrl,
-                    readOnly: true,
-                    onTap: _selectDateOfBirth,
-                    decoration: const InputDecoration(
-                      labelText: 'Date of Birth',
-                      prefixIcon: Icon(Icons.calendar_today_outlined),
-                    ),
-                  ),
-                ),
-              ],
+            TextFormField(
+              controller: _phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Phone Number',
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+            ),
+            const SizedBox(height: 14),
+            TextFormField(
+              controller: _dobCtrl,
+              readOnly: true,
+              onTap: _selectDateOfBirth,
+              decoration: const InputDecoration(
+                labelText: 'Date of Birth',
+                hintText: 'YYYY-MM-DD',
+                prefixIcon: Icon(Icons.calendar_today_outlined),
+              ),
             ),
             const SizedBox(height: 14),
             DropdownButtonFormField<String>(

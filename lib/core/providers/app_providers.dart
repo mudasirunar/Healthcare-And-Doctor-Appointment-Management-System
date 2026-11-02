@@ -305,9 +305,41 @@ final currentUserStreamProvider = StreamProvider<UserModel?>((ref) {
   return authRepo.authStateChanges();
 });
 
+/// Live real-time stream of the authenticated user's document in Firestore.
+/// Emits immediately whenever administration or the user updates their profile.
+final liveCurrentUserProvider = StreamProvider<UserModel?>((ref) {
+  final authUser = ref.watch(currentUserStreamProvider).valueOrNull;
+  if (authUser == null || authUser.id.isEmpty) return Stream.value(null);
+
+  try {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(authUser.id)
+        .snapshots()
+        .handleError((e) {
+          debugPrint('liveCurrentUserProvider stream notice: $e');
+        })
+        .map((doc) {
+      if (doc.exists && doc.data() != null) {
+        return UserModel.fromMap(doc.data()!, id: doc.id);
+      }
+      return authUser;
+    });
+  } catch (e) {
+    debugPrint('liveCurrentUserProvider init error: $e');
+    return Stream.value(authUser);
+  }
+});
+
 final currentUserProvider = StateProvider<UserModel?>((ref) {
-  final asyncUser = ref.watch(currentUserStreamProvider);
-  return asyncUser.value;
+  ref.listen<AsyncValue<UserModel?>>(liveCurrentUserProvider, (prev, next) {
+    if (next.hasValue && next.value != null) {
+      ref.controller.state = next.value;
+    }
+  });
+  final liveUser = ref.watch(liveCurrentUserProvider).valueOrNull;
+  final authUser = ref.watch(currentUserStreamProvider).valueOrNull;
+  return liveUser ?? authUser;
 });
 
 // --- DOCTORS & SPECIALTIES (REAL-TIME STREAMS) ---

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/services/user_notification_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -11,7 +12,9 @@ import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../admin/presentation/screens/admin_appointment_detail_screen.dart';
 import '../../../admin/presentation/screens/admin_doctor_detail_screen.dart';
-import '../../../admin/presentation/screens/admin_edit_patient_screen.dart';
+import 'doctor_details_screen.dart';
+import 'patient_appointment_detail_screen.dart';
+import 'unified_edit_patient_screen.dart';
 import '../../../auth/domain/entities/user_model.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
 
@@ -29,41 +32,62 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
   void _confirmDeletePatient(
     BuildContext context,
     WidgetRef ref,
-    UserModel patient,
-  ) {
+    UserModel patient, {
+    required bool isSelfDelete,
+  }) {
+    final title = isSelfDelete ? 'Remove Profile?' : 'Remove Patient?';
+    final message = isSelfDelete
+        ? 'Are you sure you want to remove your profile from hospital records? Your account and personal medical records will be permanently removed. This action cannot be undone.'
+        : 'Are you sure you want to remove ${patient.displayName} from hospital records? This action cannot be undone.';
+    final confirmLabel = isSelfDelete ? 'Remove Profile' : 'Remove Patient';
+
     showDialog(
       context: context,
       builder: (ctx) => AppDialog(
         icon: Icons.delete_outline_rounded,
         tone: AppDialogTone.destructive,
-        title: 'Remove Patient?',
-        message:
-            'Are you sure you want to remove ${patient.displayName} from hospital records? This action cannot be undone.',
+        title: title,
+        message: message,
         cancelLabel: 'Cancel',
         onCancel: () => Navigator.pop(ctx),
-        confirmLabel: 'Remove Patient',
+        confirmLabel: confirmLabel,
         confirmIsDestructive: true,
         onConfirm: () async {
           Navigator.pop(ctx);
           await ref
               .read(authRepositoryProvider)
               .deletePatientRecord(patient.id);
+
           ref.invalidate(allPatientsAdminProvider);
+          ref.invalidate(adminAnalyticsProvider);
 
-          UserNotificationService.instance.sendPatientNotification(
-            patientUserId: patient.id,
-            title: 'Account Record Removed',
-            body:
-                'Your patient profile was removed from hospital records by administration.',
-            type: 'patient_removed',
-          );
-
-          if (context.mounted) {
-            AppSnackBar.showSuccess(
-              context,
-              'Patient ${patient.displayName} removed from records.',
+          if (isSelfDelete) {
+            // Patient deleting own account: clean up app state & sign out
+            await appSignOut(ref);
+            if (context.mounted) {
+              AppSnackBar.showSuccess(
+                context,
+                'Your profile has been permanently removed from hospital records.',
+              );
+              context.go('/login');
+            }
+          } else {
+            // Admin deleting patient
+            UserNotificationService.instance.sendPatientNotification(
+              patientUserId: patient.id,
+              title: 'Account Record Removed',
+              body:
+                  'Your patient profile was removed from hospital records by administration.',
+              type: 'patient_removed',
             );
-            Navigator.pop(context);
+
+            if (context.mounted) {
+              AppSnackBar.showSuccess(
+                context,
+                'Patient ${patient.displayName} removed from records.',
+              );
+              Navigator.pop(context);
+            }
           }
         },
       ),
@@ -71,6 +95,9 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
   }
 
   Future<UserModel?> _fetchPatient(WidgetRef ref) async {
+    final current = ref.read(currentUserProvider);
+    if (current != null && current.id == patientId) return current;
+
     final allPatients = ref.read(allPatientsAdminProvider).valueOrNull ?? [];
     final matched = allPatients.where((p) => p.id == patientId).firstOrNull;
     if (matched != null) return matched;
@@ -93,6 +120,7 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
     final effectiveRole =
         role ?? ref.watch(currentUserProvider)?.role ?? UserRole.admin;
     final isAdmin = effectiveRole == UserRole.admin;
+    final isPatient = effectiveRole == UserRole.patient;
 
     final allPatients = ref.watch(allPatientsAdminProvider).valueOrNull ?? [];
     final allDocs = ref.watch(allDoctorsAdminProvider).valueOrNull ?? [];
@@ -106,8 +134,10 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
     final borderColor = AppColors.borderOf(context);
     final surfaceColor = AppColors.surfaceOf(context);
 
-    final preloadedPatient =
-        allPatients.where((p) => p.id == patientId).firstOrNull;
+    final currentUser = ref.watch(currentUserProvider);
+    final preloadedPatient = (currentUser != null && currentUser.id == patientId)
+        ? currentUser
+        : allPatients.where((p) => p.id == patientId).firstOrNull;
 
     return FutureBuilder<UserModel?>(
       initialData: preloadedPatient,
@@ -168,17 +198,19 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
             backgroundColor: surfaceColor,
             elevation: 0,
             scrolledUnderElevation: 0,
-            actions: isAdmin
+            actions: (isAdmin || isPatient)
                 ? [
                     IconButton(
                       icon: const Icon(Icons.edit_outlined),
-                      tooltip: 'Edit Records',
+                      tooltip: 'Edit Profile',
                       onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) =>
-                                AdminEditPatientScreen(patient: patient),
+                            builder: (_) => UnifiedEditPatientScreen(
+                              patient: patient,
+                              editorRole: effectiveRole,
+                            ),
                           ),
                         );
                       },
@@ -190,12 +222,19 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) =>
-                                  AdminEditPatientScreen(patient: patient),
+                              builder: (_) => UnifiedEditPatientScreen(
+                                patient: patient,
+                                editorRole: effectiveRole,
+                              ),
                             ),
                           );
                         } else if (action == 'delete') {
-                          _confirmDeletePatient(context, ref, patient);
+                          _confirmDeletePatient(
+                            context,
+                            ref,
+                            patient,
+                            isSelfDelete: isPatient,
+                          );
                         }
                       },
                       itemBuilder: (ctx) => [
@@ -205,7 +244,7 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                             children: [
                               Icon(Icons.edit_outlined, size: 18),
                               SizedBox(width: 10),
-                              Text('Edit Patient Profile'),
+                              Text('Edit Profile'),
                             ],
                           ),
                         ),
@@ -220,7 +259,7 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                               ),
                               SizedBox(width: 10),
                               Text(
-                                'Remove from Records',
+                                'Remove Profile',
                                 style: TextStyle(color: AppColors.error),
                               ),
                             ],
@@ -355,6 +394,11 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                     : 'Not specified',
               ),
               _InfoRow(
+                label: 'Age',
+                value: DateTimeUtils.calculateAge(patient.dateOfBirth) ??
+                    'Not specified',
+              ),
+              _InfoRow(
                 label: 'Date of Birth',
                 value: patient.dateOfBirth?.isNotEmpty == true
                     ? patient.dateOfBirth!
@@ -408,9 +452,9 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (_) => AdminDoctorDetailScreen(
-                                doctorId: doc.id,
-                              ),
+                              builder: (_) => isAdmin
+                                  ? AdminDoctorDetailScreen(doctorId: doc.id)
+                                  : DoctorDetailsScreen(doctorId: doc.id),
                             ),
                           );
                         },
@@ -499,16 +543,18 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                     children: [
                       InkWell(
                         onTap: () {
-                          if (isAdmin) {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AdminAppointmentDetailScreen(
-                                  appointmentId: apt.id,
-                                ),
-                              ),
-                            );
-                          }
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => isAdmin
+                                  ? AdminAppointmentDetailScreen(
+                                      appointmentId: apt.id,
+                                    )
+                                  : PatientAppointmentDetailScreen(
+                                      appointmentId: apt.id,
+                                    ),
+                            ),
+                          );
                         },
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -667,15 +713,23 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
                   );
                 }),
 
-              // Danger Remove Patient Button (Admin only)
-              if (isAdmin)
+              // Danger Remove Profile / Patient Button (Admin & Patient)
+              if (isAdmin || isPatient)
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
                   child: OutlinedButton.icon(
-                    onPressed: () =>
-                        _confirmDeletePatient(context, ref, patient),
+                    onPressed: () => _confirmDeletePatient(
+                      context,
+                      ref,
+                      patient,
+                      isSelfDelete: isPatient,
+                    ),
                     icon: const Icon(Icons.delete_outline_rounded, size: 20),
-                    label: const Text('Remove Patient from Hospital Records'),
+                    label: Text(
+                      isPatient
+                          ? 'Remove Profile from Hospital Records'
+                          : 'Remove Patient from Hospital Records',
+                    ),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.error,
                       side:

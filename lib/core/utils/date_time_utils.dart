@@ -98,4 +98,41 @@ class DateTimeUtils {
       return utcIsoString;
     }
   }
+
+  /// Calculates age in years from a date of birth string (e.g. "1995-05-12").
+  /// Returns formatted string e.g. "29 years old", or null if invalid or unparseable.
+  static String? calculateAge(String? dateOfBirth) {
+    if (dateOfBirth == null || dateOfBirth.trim().isEmpty) return null;
+    DateTime? dob = DateTime.tryParse(dateOfBirth.trim());
+    if (dob == null) {
+      final parts = dateOfBirth.trim().split(RegExp(r'[-/]'));
+      if (parts.length == 3) {
+        if (parts[0].length == 4) {
+          final y = int.tryParse(parts[0]);
+          final m = int.tryParse(parts[1]);
+          final d = int.tryParse(parts[2]);
+          if (y != null && m != null && d != null) dob = DateTime(y, m, d);
+        } else if (parts[2].length == 4) {
+          final dOrM = int.tryParse(parts[0]);
+          final mOrD = int.tryParse(parts[1]);
+          final y = int.tryParse(parts[2]);
+          if (dOrM != null && mOrD != null && y != null) {
+            if (mOrD > 12) {
+              dob = DateTime(y, dOrM, mOrD);
+            } else {
+              dob = DateTime(y, mOrD, dOrM);
+            }
+          }
+        }
+      }
+    }
+    if (dob == null) return null;
+    final now = DateTime.now();
+    int age = now.year - dob.year;
+    if (now.month < dob.month || (now.month == dob.month && now.day < dob.day)) {
+      age--;
+    }
+    if (age < 0) return null;
+    return age == 1 ? '1 year old' : '$age years old';
+  }
 }

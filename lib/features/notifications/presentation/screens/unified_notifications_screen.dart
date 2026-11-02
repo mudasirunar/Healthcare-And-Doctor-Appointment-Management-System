@@ -11,7 +11,9 @@ import '../../../admin/domain/entities/admin_notification_model.dart';
 import '../../../admin/presentation/screens/admin_appointment_detail_screen.dart';
 import '../../../admin/presentation/screens/admin_doctor_detail_screen.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
+import '../../../auth/domain/entities/user_model.dart';
 import '../../../patient/presentation/screens/patient_appointment_detail_screen.dart';
+import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
 
 /// Role targeting for notification presentation and behavior
 enum NotificationRole {
@@ -144,6 +146,27 @@ class _UnifiedNotificationsScreenState
               targetAppointmentId = apt.id;
               break;
             }
+          }
+        }
+
+        // Profile updates: Navigate directly to patient's own profile screen
+        if (item.type == 'patient_profile_updated' ||
+            item.type.contains('profile')) {
+          final currentUser = ref.read(currentUserProvider);
+          final pid = (item.targetId != null && item.targetId!.isNotEmpty)
+              ? item.targetId!
+              : (currentUser?.id ?? '');
+          if (pid.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UnifiedPatientDetailScreen(
+                  patientId: pid,
+                  role: UserRole.patient,
+                ),
+              ),
+            );
+            return;
           }
         }
 

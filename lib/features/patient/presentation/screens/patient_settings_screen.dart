@@ -5,9 +5,12 @@ import '../../../../core/services/preferences_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
-import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
+import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../auth/domain/entities/user_model.dart';
+import 'patient_care_insights_screen.dart';
+import 'unified_edit_patient_screen.dart';
+import 'unified_patient_detail_screen.dart';
 
 class PatientSettingsScreen extends ConsumerStatefulWidget {
   final VoidCallback onSignOut;
@@ -28,167 +31,6 @@ class _PatientSettingsScreenState extends ConsumerState<PatientSettingsScreen> {
   bool _appointmentAlerts =
       PreferencesService.instance.getAppointmentAlertsEnabled();
 
-  void _showEditProfileDialog(UserModel user) {
-    final nameCtrl = TextEditingController(text: user.displayName);
-    final phoneCtrl = TextEditingController(text: user.phoneNumber ?? '');
-    final dobCtrl = TextEditingController(text: user.dateOfBirth ?? '');
-    final emergencyCtrl =
-        TextEditingController(text: user.emergencyContact ?? '');
-    final allergiesCtrl =
-        TextEditingController(text: user.medicalAllergies ?? '');
-    String selectedBloodGroup = user.bloodGroup ?? 'O+';
-
-    final bloodGroups = [
-      'A+',
-      'A-',
-      'B+',
-      'B-',
-      'AB+',
-      'AB-',
-      'O+',
-      'O-',
-      'Unknown'
-    ];
-    if (!bloodGroups.contains(selectedBloodGroup)) {
-      selectedBloodGroup = 'Unknown';
-    }
-
-    final formKey = GlobalKey<FormState>();
-    bool isSaving = false;
-
-    showDialog(
-      context: context,
-      barrierDismissible: !isSaving,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AppDialog(
-          title: 'Edit Medical Profile',
-          message: 'Update your clinical demographics and emergency details.',
-          confirmLabel: 'Save Changes',
-          confirmIsLoading: isSaving,
-          confirmIsEnabled: !isSaving,
-          cancelLabel: 'Cancel',
-          cancelIsEnabled: !isSaving,
-          onCancel: () => Navigator.pop(ctx),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  controller: nameCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Name *',
-                    prefixIcon: Icon(Icons.person_outline_rounded),
-                  ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) {
-                      return 'Full name is required';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Phone Number',
-                    prefixIcon: Icon(Icons.phone_outlined),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: selectedBloodGroup,
-                  decoration: const InputDecoration(
-                    labelText: 'Blood Group',
-                    prefixIcon: Icon(Icons.water_drop_outlined),
-                  ),
-                  items: bloodGroups.map((bg) {
-                    return DropdownMenuItem(value: bg, child: Text(bg));
-                  }).toList(),
-                  onChanged: (val) {
-                    if (val != null) {
-                      setDialogState(() => selectedBloodGroup = val);
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: dobCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Date of Birth (YYYY-MM-DD)',
-                    prefixIcon: Icon(Icons.calendar_today_outlined),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: emergencyCtrl,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Emergency Contact',
-                    prefixIcon: Icon(Icons.contact_phone_outlined),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: allergiesCtrl,
-                  maxLines: 2,
-                  decoration: const InputDecoration(
-                    labelText: 'Known Allergies',
-                    hintText: 'e.g. Penicillin, Peanuts, Latex...',
-                    prefixIcon: Icon(Icons.healing_outlined),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          onConfirm: () async {
-            if (!formKey.currentState!.validate()) return;
-            setDialogState(() => isSaving = true);
-
-            final updated = user.copyWith(
-              displayName: nameCtrl.text.trim(),
-              phoneNumber: phoneCtrl.text.trim().isEmpty
-                  ? null
-                  : phoneCtrl.text.trim(),
-              bloodGroup: selectedBloodGroup,
-              dateOfBirth:
-                  dobCtrl.text.trim().isEmpty ? null : dobCtrl.text.trim(),
-              emergencyContact: emergencyCtrl.text.trim().isEmpty
-                  ? null
-                  : emergencyCtrl.text.trim(),
-              medicalAllergies: allergiesCtrl.text.trim().isEmpty
-                  ? null
-                  : allergiesCtrl.text.trim(),
-            );
-
-            try {
-              await ref.read(authRepositoryProvider).updateProfile(updated);
-              ref.read(currentUserProvider.notifier).state = updated;
-
-              if (ctx.mounted) {
-                Navigator.pop(ctx);
-              }
-              if (mounted) {
-                AppSnackBar.showSuccess(
-                  context,
-                  'Medical profile updated successfully.',
-                );
-              }
-            } catch (e) {
-              if (ctx.mounted) {
-                setDialogState(() => isSaving = false);
-              }
-              if (mounted) {
-                AppSnackBar.showError(context, e.toString());
-              }
-            }
-          },
-        ),
-      ),
-    );
-  }
-
   void _handlePasswordReset() {
     final user = ref.read(currentUserProvider);
     final email = user?.email ?? '';
@@ -205,7 +47,40 @@ class _PatientSettingsScreenState extends ConsumerState<PatientSettingsScreen> {
     final user = ref.watch(currentUserProvider);
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
+    final surfaceColor = AppColors.surfaceOf(context);
     final borderColor = AppColors.borderOf(context);
+
+    // Compute key care metrics for the highlights preview
+    final appointments = ref.watch(userAppointmentsProvider).valueOrNull ?? [];
+    final doctors = ref.watch(verifiedDoctorsStreamProvider).valueOrNull ?? [];
+
+    final completedVisits = appointments
+        .where((a) => a.status == AppointmentStatus.completed)
+        .toList();
+    final upcomingVisits = appointments
+        .where((a) =>
+            a.status == AppointmentStatus.confirmed ||
+            a.status == AppointmentStatus.requested ||
+            a.status == AppointmentStatus.inProgress)
+        .toList();
+    final cancelledVisits = appointments
+        .where((a) => a.status == AppointmentStatus.cancelled)
+        .toList();
+
+    final prescriptionsCount = completedVisits
+        .where((a) => a.prescriptionId != null || a.consultationNotes != null)
+        .length;
+
+    double totalSpent = 0.0;
+    for (final a in completedVisits) {
+      final doc = doctors.where((d) => d.id == a.doctorId).firstOrNull;
+      totalSpent += doc?.consultationFee ?? 50.0;
+    }
+
+    final totalResolved = completedVisits.length + cancelledVisits.length;
+    final attendanceRate = totalResolved > 0
+        ? ((completedVisits.length / totalResolved) * 100).toStringAsFixed(0)
+        : '100';
 
     return ListView(
       controller: widget.scrollController,
@@ -293,10 +168,41 @@ class _PatientSettingsScreenState extends ConsumerState<PatientSettingsScreen> {
                 ),
               ),
               if (user != null)
-                TextButton.icon(
-                  onPressed: () => _showEditProfileDialog(user),
-                  icon: const Icon(Icons.edit_outlined, size: 16),
-                  label: const Text('Edit'),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => UnifiedPatientDetailScreen(
+                              patientId: user.id,
+                              role: UserRole.patient,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.visibility_outlined, size: 16),
+                      label: const Text('View'),
+                    ),
+                    const SizedBox(width: 4),
+                    TextButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => UnifiedEditPatientScreen(
+                              patient: user,
+                              editorRole: UserRole.patient,
+                            ),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 16),
+                      label: const Text('Edit'),
+                    ),
+                  ],
                 ),
             ],
           ),
@@ -311,40 +217,105 @@ class _PatientSettingsScreenState extends ConsumerState<PatientSettingsScreen> {
         ),
         Divider(height: 1, color: borderColor),
 
-        // 3. Clinical Profile Records (Flat Rows)
+        // 3. Care Insights & Activity Highlights Preview
         Padding(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 6),
-          child: Text(
-            'Clinical & Medical Records',
-            style: AppTypography.headline.copyWith(
-              fontSize: 15,
-              color: textPrimary,
-            ),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Care Insights & Highlights',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 15,
+                  color: textPrimary,
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PatientCareInsightsScreen(),
+                    ),
+                  );
+                },
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'View More',
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    SizedBox(width: 4),
+                    Icon(Icons.arrow_forward_ios_rounded, size: 12),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-        _FlatPatientInfoRow(
-          icon: Icons.water_drop_outlined,
-          title: 'Blood Group',
-          value: user?.bloodGroup ?? 'Not specified',
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  _SettingsInsightTile(
+                    title: 'Completed Visits',
+                    value: '${completedVisits.length}',
+                    subtitle: '${upcomingVisits.length} upcoming scheduled',
+                    icon: Icons.check_circle_outline_rounded,
+                    surfaceColor: surfaceColor,
+                    borderColor: borderColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                  ),
+                  const SizedBox(width: 12),
+                  _SettingsInsightTile(
+                    title: 'Prescriptions',
+                    value: '$prescriptionsCount',
+                    subtitle: 'Digital Rx on record',
+                    icon: Icons.medication_outlined,
+                    surfaceColor: surfaceColor,
+                    borderColor: borderColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _SettingsInsightTile(
+                    title: 'Care Spending',
+                    value: '\$${totalSpent.toStringAsFixed(0)}',
+                    subtitle: completedVisits.isEmpty
+                        ? 'No expenses yet'
+                        : '${completedVisits.length} consultation${completedVisits.length == 1 ? '' : 's'}',
+                    icon: Icons.account_balance_wallet_outlined,
+                    surfaceColor: surfaceColor,
+                    borderColor: borderColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                  ),
+                  const SizedBox(width: 12),
+                  _SettingsInsightTile(
+                    title: 'Adherence Rate',
+                    value: '$attendanceRate%',
+                    subtitle: '${cancelledVisits.length} cancelled',
+                    icon: Icons.pie_chart_outline_rounded,
+                    surfaceColor: surfaceColor,
+                    borderColor: borderColor,
+                    textPrimary: textPrimary,
+                    textSecondary: textSecondary,
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        Divider(height: 1, indent: 74, endIndent: 20, color: borderColor),
-        _FlatPatientInfoRow(
-          icon: Icons.cake_outlined,
-          title: 'Date of Birth',
-          value: user?.dateOfBirth ?? 'Not specified',
-        ),
-        Divider(height: 1, indent: 74, endIndent: 20, color: borderColor),
-        _FlatPatientInfoRow(
-          icon: Icons.contact_phone_outlined,
-          title: 'Emergency Contact',
-          value: user?.emergencyContact ?? 'Not specified',
-        ),
-        Divider(height: 1, indent: 74, endIndent: 20, color: borderColor),
-        _FlatPatientInfoRow(
-          icon: Icons.healing_outlined,
-          title: 'Known Allergies',
-          value: user?.medicalAllergies ?? 'None registered',
-        ),
+        const SizedBox(height: 14),
         Divider(height: 1, color: borderColor),
 
         // 4. App Preferences & Security
@@ -462,52 +433,79 @@ class _PatientSettingsScreenState extends ConsumerState<PatientSettingsScreen> {
   }
 }
 
-class _FlatPatientInfoRow extends StatelessWidget {
-  final IconData icon;
+class _SettingsInsightTile extends StatelessWidget {
   final String title;
   final String value;
+  final String subtitle;
+  final IconData icon;
+  final Color surfaceColor;
+  final Color borderColor;
+  final Color textPrimary;
+  final Color textSecondary;
 
-  const _FlatPatientInfoRow({
-    required this.icon,
+  const _SettingsInsightTile({
     required this.title,
     required this.value,
+    required this.subtitle,
+    required this.icon,
+    required this.surfaceColor,
+    required this.borderColor,
+    required this.textPrimary,
+    required this.textSecondary,
   });
 
   @override
   Widget build(BuildContext context) {
-    final textPrimary = AppColors.textPrimaryOf(context);
-    final textSecondary = AppColors.textSecondaryOf(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(13),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Flexible(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTypography.caption.copyWith(
+                      color: textSecondary,
+                      fontWeight: FontWeight.w500,
+                      fontSize: 11.5,
+                    ),
+                  ),
+                ),
+                Icon(icon, size: 16, color: AppColors.primary),
+              ],
             ),
-            child: Icon(icon, size: 20, color: AppColors.primary),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(
-              title,
-              style: AppTypography.bodyMedium.copyWith(
-                color: textSecondary,
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: AppTypography.headline.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: textPrimary,
               ),
             ),
-          ),
-          Text(
-            value,
-            style: AppTypography.bodyLarge.copyWith(
-              fontWeight: FontWeight.w600,
-              color: textPrimary,
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: AppTypography.caption.copyWith(
+                color: textSecondary,
+                fontSize: 11,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

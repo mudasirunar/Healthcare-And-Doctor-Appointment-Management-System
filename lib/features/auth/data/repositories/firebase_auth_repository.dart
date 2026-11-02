@@ -156,10 +156,31 @@ class FirebaseAuthRepository implements AuthRepository {
 
   @override
   Future<UserModel> updateProfile(UserModel user) async {
+    final effectiveId = user.id.isNotEmpty
+        ? user.id
+        : (_firebaseAuth.currentUser?.uid ?? '');
+    if (effectiveId.isEmpty) {
+      throw const AuthException('No valid user ID to update profile.');
+    }
+
     final updatedMap = user.toMap();
+    updatedMap['id'] = effectiveId;
     updatedMap['updatedAt'] = DateTime.now().toUtc().toIso8601String();
-    await _firestore.collection('users').doc(user.id).update(updatedMap);
-    return user;
+
+    await _firestore.collection('users').doc(effectiveId).update(updatedMap);
+
+    // Sync Auth display name in background without blocking or delaying the user
+    if (_firebaseAuth.currentUser != null &&
+        _firebaseAuth.currentUser!.uid == effectiveId &&
+        user.displayName.isNotEmpty) {
+      unawaited(
+        _firebaseAuth.currentUser!
+            .updateDisplayName(user.displayName)
+            .catchError((_) {}),
+      );
+    }
+
+    return user.copyWith(id: effectiveId);
   }
 
   @override
