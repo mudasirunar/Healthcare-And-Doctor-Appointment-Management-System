@@ -450,9 +450,11 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
     final isSentByMe = apt.lastMessageSenderId != null &&
         apt.lastMessageSenderId == currentUser?.id;
 
+    final isCall = hasLastMsg && apt.lastMessageContent!.startsWith('VIDEO_CALL:');
+
     // Determine WhatsApp-style message delivery and read status
     MessageTickStatus? messageTick;
-    if (hasLastMsg && isSentByMe) {
+    if (hasLastMsg && isSentByMe && !isCall) {
       final recipientUnread = isPatient
           ? apt.unreadCountForDoctor
           : apt.unreadCountForPatient;
@@ -472,10 +474,18 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
     // Display text:
     // - If sent by me: clean message text without "You: " prefix (the tick icon indicates it's yours!)
     // - If received: clean message text without sender name prefix
+    // - If call: "Video call" with proper themed icon
     // - If no messages yet: "Consultation booked • Tap to chat"
-    String lastMessageDisplay = hasLastMsg
-        ? apt.lastMessageContent!
-        : 'Consultation booked • Tap to chat';
+    String lastMessageDisplay;
+    if (hasLastMsg) {
+      if (isCall) {
+        lastMessageDisplay = 'Video call';
+      } else {
+        lastMessageDisplay = apt.lastMessageContent!;
+      }
+    } else {
+      lastMessageDisplay = 'Consultation booked • Tap to chat';
+    }
 
     // Smart snippet preview when query matches older chat history
     if (_query.trim().isNotEmpty) {
@@ -519,6 +529,7 @@ class _UnifiedChatsHubScreenState extends ConsumerState<UnifiedChatsHubScreen> {
         participantSubtitle: participantSubtitle,
         participantUserId: targetUserId,
         lastMessageText: lastMessageDisplay,
+        isCallRecord: isCall,
         timeText: timeStr,
         messageTick: messageTick,
         unreadCount: itemUnreadCount,
@@ -590,6 +601,7 @@ class _ConversationListTile extends ConsumerWidget {
   final String participantSubtitle;
   final String participantUserId;
   final String lastMessageText;
+  final bool isCallRecord;
   final String? timeText;
   final MessageTickStatus? messageTick;
   final int unreadCount;
@@ -605,6 +617,7 @@ class _ConversationListTile extends ConsumerWidget {
     required this.participantSubtitle,
     required this.participantUserId,
     required this.lastMessageText,
+    this.isCallRecord = false,
     required this.timeText,
     this.messageTick,
     required this.unreadCount,
@@ -751,7 +764,14 @@ class _ConversationListTile extends ConsumerWidget {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      if (messageTick != null) ...[
+                      if (isCallRecord) ...[
+                        Icon(
+                          Icons.videocam_rounded,
+                          size: 15,
+                          color: hasUnread ? AppColors.primary : textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                      ] else if (messageTick != null) ...[
                         _MessageStatusTick(status: messageTick!),
                         const SizedBox(width: 4),
                       ],

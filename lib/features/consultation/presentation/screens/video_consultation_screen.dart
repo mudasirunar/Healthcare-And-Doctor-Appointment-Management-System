@@ -1,14 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/state_views.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
 
 enum TelehealthCallState {
-  initiating,
+  calling,
   ringing,
   connected,
 }
@@ -25,35 +24,39 @@ class VideoConsultationScreen extends ConsumerStatefulWidget {
 
 class _VideoConsultationScreenState
     extends ConsumerState<VideoConsultationScreen> {
-  TelehealthCallState _callState = TelehealthCallState.initiating;
+  TelehealthCallState _callState = TelehealthCallState.calling;
   bool _isMicMuted = false;
   bool _isVideoOff = false;
+  bool _isRecording = false;
+  bool _isEnding = false;
+
   int _elapsedSeconds = 0;
   Timer? _sessionTimer;
   Timer? _stateProgressionTimer;
+  late final Future<AppointmentModel?> _appointmentFuture;
 
   @override
   void initState() {
     super.initState();
+    // Cache the future upfront so session timer ticks never cause screen flicker!
+    _appointmentFuture = ref
+        .read(appointmentRepositoryProvider)
+        .getAppointmentById(widget.appointmentId);
     _startCallProgression();
   }
 
   void _startCallProgression() {
-    // 1. Simulates initiating connection
-    _stateProgressionTimer = Timer(const Duration(milliseconds: 1400), () {
-      if (mounted) {
-        setState(() => _callState = TelehealthCallState.ringing);
+    // 1. Calling for ~1.2s
+    _stateProgressionTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (!mounted) return;
+      setState(() => _callState = TelehealthCallState.ringing);
 
-        // 2. Simulates doctor answering call and connecting audio/video stream
-        _stateProgressionTimer = Timer(const Duration(milliseconds: 2200), () {
-          if (mounted) {
-            setState(() {
-              _callState = TelehealthCallState.connected;
-            });
-            _startSessionTimer();
-          }
-        });
-      }
+      // 2. Ringing for ~2.5s
+      _stateProgressionTimer = Timer(const Duration(milliseconds: 2500), () {
+        if (!mounted) return;
+        setState(() => _callState = TelehealthCallState.connected);
+        _startSessionTimer();
+      });
     });
   }
 
@@ -63,6 +66,34 @@ class _VideoConsultationScreenState
         setState(() => _elapsedSeconds++);
       }
     });
+  }
+
+  Future<void> _endCall() async {
+    if (_isEnding) return;
+    _isEnding = true;
+
+    _stateProgressionTimer?.cancel();
+    _sessionTimer?.cancel();
+
+    final user = ref.read(currentUserProvider);
+    final totalSecs = _elapsedSeconds;
+
+    // Record the call log in appointment chat (WhatsApp style)
+    if (user != null) {
+      try {
+        await ref.read(appointmentRepositoryProvider).sendMessage(
+              appointmentId: widget.appointmentId,
+              senderId: user.id,
+              senderName: user.displayName,
+              senderRole: user.role.name,
+              content: 'VIDEO_CALL:$totalSecs',
+            );
+      } catch (_) {}
+    }
+
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override
@@ -80,59 +111,29 @@ class _VideoConsultationScreenState
 
   @override
   Widget build(BuildContext context) {
-    final aptRepo = ref.watch(appointmentRepositoryProvider);
     final user = ref.watch(currentUserProvider);
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A), // Dark clinical room backdrop
+      backgroundColor: const Color(0xFF0F172A), // Dark clinical backdrop
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: Colors.white,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Encrypted Consultation Call',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 15.5,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            Text(
-              _callState == TelehealthCallState.initiating
-                  ? 'Connecting to secure telehealth server...'
-                  : _callState == TelehealthCallState.ringing
-                      ? 'Ringing specialist device...'
-                      : 'Session Duration: ${_formatTimer(_elapsedSeconds)}',
-              style: TextStyle(
-                color: _callState == TelehealthCallState.connected
-                    ? const Color(0xFF38BDF8)
-                    : Colors.white70,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
+        leading: IconButton(
+          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 26),
+          tooltip: 'End Call',
+          onPressed: _endCall,
         ),
-        actions: [
-          IconButton(
-            tooltip: 'Appointment Chat',
-            icon: const Icon(Icons.chat_bubble_outline_rounded,
-                color: Colors.white),
-            onPressed: () =>
-                context.push('/consultation/chat/${widget.appointmentId}'),
-          ),
-          const SizedBox(width: 4),
-        ],
+        title: null,
+        actions: const [],
       ),
       body: FutureBuilder<AppointmentModel?>(
-        future: aptRepo.getAppointmentById(widget.appointmentId),
+        future: _appointmentFuture, // Cached future prevents continuous flickering
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(
-                child: CircularProgressIndicator(color: Colors.white));
+              child: CircularProgressIndicator(color: Colors.white),
+            );
           }
           final apt = snapshot.data;
           if (apt == null) {
@@ -142,11 +143,29 @@ class _VideoConsultationScreenState
           final remoteParticipantName =
               user?.isDoctor == true ? apt.patientName : apt.doctorName;
 
+          // Connection status label (no long doctor name, no overflow)
+          String statusText;
+          Color statusDotColor;
+          switch (_callState) {
+            case TelehealthCallState.calling:
+              statusText = 'Calling...';
+              statusDotColor = const Color(0xFFF59E0B);
+              break;
+            case TelehealthCallState.ringing:
+              statusText = 'Ringing...';
+              statusDotColor = const Color(0xFFF59E0B);
+              break;
+            case TelehealthCallState.connected:
+              statusText = 'Connected';
+              statusDotColor = AppColors.success;
+              break;
+          }
+
           return Column(
             children: [
-              // Connection Status Pill
+              // Clean Connection Status Pill (Zero overflow)
               Container(
-                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.1),
@@ -159,23 +178,18 @@ class _VideoConsultationScreenState
                       width: 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: _callState == TelehealthCallState.connected
-                            ? AppColors.success
-                            : const Color(0xFFF59E0B),
+                        color: statusDotColor,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      _callState == TelehealthCallState.connected
-                          ? 'Connected with $remoteParticipantName • HD 60fps Encrypted'
-                          : _callState == TelehealthCallState.ringing
-                              ? 'Ringing $remoteParticipantName...'
-                              : 'Initiating Consultation...',
+                      statusText,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontSize: 11.5,
+                        fontSize: 12,
                         fontWeight: FontWeight.w600,
+                        letterSpacing: 0.2,
                       ),
                     ),
                   ],
@@ -188,7 +202,7 @@ class _VideoConsultationScreenState
                   padding: const EdgeInsets.all(16),
                   child: Stack(
                     children: [
-                      // Remote Feed
+                      // Remote Feed Canvas
                       Container(
                         width: double.infinity,
                         height: double.infinity,
@@ -207,16 +221,20 @@ class _VideoConsultationScreenState
                                     AppColors.primary.withOpacity(0.3),
                                 child: Text(
                                   remoteParticipantName.isNotEmpty
-                                      ? remoteParticipantName[0].toUpperCase()
+                                      ? remoteParticipantName
+                                          .replaceFirst(RegExp(r'^Dr\.\s*'), '')
+                                          .characters
+                                          .first
+                                          .toUpperCase()
                                       : 'U',
                                   style: const TextStyle(
-                                    fontSize: 42,
+                                    fontSize: 40,
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold,
                                   ),
                                 ),
                               ),
-                              const SizedBox(height: 14),
+                              const SizedBox(height: 16),
                               Text(
                                 remoteParticipantName,
                                 style: const TextStyle(
@@ -235,12 +253,43 @@ class _VideoConsultationScreenState
                                   fontSize: 13,
                                 ),
                               ),
-                              if (_callState !=
-                                  TelehealthCallState.connected) ...[
-                                const SizedBox(height: 16),
+
+                              const SizedBox(height: 12),
+
+                              // Call Duration in the Middle (Below Name and Specialty)
+                              if (_callState == TelehealthCallState.connected) ...[
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 14, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black26,
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.access_time_rounded,
+                                        size: 14,
+                                        color: Color(0xFF38BDF8),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        _formatTimer(_elapsedSeconds),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.5,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ] else ...[
                                 const SizedBox(
-                                  width: 22,
-                                  height: 22,
+                                  width: 20,
+                                  height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: Color(0xFF38BDF8),
@@ -262,7 +311,8 @@ class _VideoConsultationScreenState
                           decoration: BoxDecoration(
                             color: const Color(0xFF334155),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white24, width: 1.5),
+                            border:
+                                Border.all(color: Colors.white24, width: 1.5),
                           ),
                           child: Center(
                             child: _isVideoOff
@@ -293,12 +343,13 @@ class _VideoConsultationScreenState
                 ),
               ),
 
-              // Bottom Flat Control Dock
+              // Bottom Control Dock
               Container(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+                padding: const EdgeInsets.fromLTRB(20, 10, 20, 32),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
+                    // Mic Toggle
                     _CallDockButton(
                       icon: _isMicMuted
                           ? Icons.mic_off_rounded
@@ -307,6 +358,8 @@ class _VideoConsultationScreenState
                       label: _isMicMuted ? 'Muted' : 'Mic On',
                       onTap: () => setState(() => _isMicMuted = !_isMicMuted),
                     ),
+
+                    // Video Toggle
                     _CallDockButton(
                       icon: _isVideoOff
                           ? Icons.videocam_off_rounded
@@ -315,17 +368,22 @@ class _VideoConsultationScreenState
                       label: _isVideoOff ? 'Video Off' : 'Video On',
                       onTap: () => setState(() => _isVideoOff = !_isVideoOff),
                     ),
+
+                    // Visual Record Button (Toggles highlight/color)
                     _CallDockButton(
-                      icon: Icons.chat_rounded,
+                      icon: _isRecording
+                          ? Icons.stop_circle_rounded
+                          : Icons.fiber_manual_record_rounded,
                       isActive: true,
-                      label: 'Chat',
-                      onTap: () => context
-                          .push('/consultation/chat/${widget.appointmentId}'),
+                      isHighlighted: _isRecording,
+                      label: _isRecording ? 'Recording' : 'Record',
+                      onTap: () => setState(() => _isRecording = !_isRecording),
                     ),
-                    // End Call
-                    InkWell(
-                      onTap: () => Navigator.pop(context),
-                      borderRadius: BorderRadius.circular(30),
+
+                    // End Call Button
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _endCall,
                       child: Container(
                         padding: const EdgeInsets.all(14),
                         decoration: const BoxDecoration(
@@ -352,40 +410,57 @@ class _CallDockButton extends StatelessWidget {
   final bool isActive;
   final String label;
   final VoidCallback onTap;
+  final bool isHighlighted;
 
   const _CallDockButton({
     required this.icon,
     required this.isActive,
     required this.label,
     required this.onTap,
+    this.isHighlighted = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    final Color buttonBg;
+    final Color iconColor;
+
+    if (isHighlighted) {
+      buttonBg = Colors.white;
+      iconColor = AppColors.error;
+    } else {
+      buttonBg = isActive
+          ? Colors.white.withOpacity(0.15)
+          : Colors.red.withOpacity(0.2);
+      iconColor = isActive ? Colors.white : AppColors.error;
+    }
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(30),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: isActive
-                  ? Colors.white.withOpacity(0.15)
-                  : Colors.red.withOpacity(0.2),
+              color: buttonBg,
               shape: BoxShape.circle,
             ),
             child: Icon(
               icon,
-              color: isActive ? Colors.white : AppColors.error,
+              color: iconColor,
               size: 22,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 5),
           Text(
             label,
-            style: const TextStyle(color: Colors.white70, fontSize: 10),
+            style: TextStyle(
+              color: isHighlighted ? Colors.white : Colors.white70,
+              fontSize: 10.5,
+              fontWeight: isHighlighted ? FontWeight.w700 : FontWeight.w500,
+            ),
           ),
         ],
       ),

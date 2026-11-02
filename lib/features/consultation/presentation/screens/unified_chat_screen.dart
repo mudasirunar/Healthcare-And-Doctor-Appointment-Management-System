@@ -478,7 +478,158 @@ class _UnifiedChatScreenState extends ConsumerState<UnifiedChatScreen> {
                                 .any((p) => p.id == msg.id && p.isPending);
                         final isNewAnim = _animatingMessageIds.contains(msg.id);
 
-                        final bubbleWidget = Align(
+                        final isCallRecord = msg.content.startsWith('VIDEO_CALL:');
+                        final Widget bubbleWidget;
+
+                        if (isCallRecord) {
+                          final parts = msg.content.split(':');
+                          final durationSecs =
+                              parts.length > 1 ? (int.tryParse(parts[1]) ?? 0) : 0;
+                          final isMissed = durationSecs == 0;
+                          final durationText = isMissed
+                              ? (isMe ? 'Cancelled' : 'Missed')
+                              : (durationSecs < 60
+                                  ? '$durationSecs sec'
+                                  : '${durationSecs ~/ 60}m ${durationSecs % 60}s');
+
+                          bubbleWidget = Align(
+                            alignment: isMe
+                                ? Alignment.centerRight
+                                : Alignment.centerLeft,
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(vertical: 4),
+                              constraints: BoxConstraints(
+                                maxWidth:
+                                    MediaQuery.of(context).size.width * 0.78,
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 10),
+                              decoration: BoxDecoration(
+                                color: isMe
+                                    ? (isDark
+                                        ? const Color(0xFF1E3A5F)
+                                        : const Color(0xFFE0F2FE))
+                                    : (isDark
+                                        ? surfaceColor
+                                        : const Color(0xFFF1F5F9)),
+                                borderRadius: BorderRadius.only(
+                                  topLeft: const Radius.circular(16),
+                                  topRight: const Radius.circular(16),
+                                  bottomLeft: isMe
+                                      ? const Radius.circular(16)
+                                      : const Radius.circular(3),
+                                  bottomRight: isMe
+                                      ? const Radius.circular(3)
+                                      : const Radius.circular(16),
+                                ),
+                                border: Border.all(
+                                  color: isMe
+                                      ? AppColors.primary.withOpacity(0.35)
+                                      : borderColor,
+                                ),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: isMe
+                                    ? CrossAxisAlignment.end
+                                    : CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                          color: isMissed
+                                              ? AppColors.error.withOpacity(0.12)
+                                              : AppColors.primary.withOpacity(0.15),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          Icons.videocam_rounded,
+                                          color: isMissed
+                                              ? AppColors.error
+                                              : AppColors.primary,
+                                          size: 20,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Flexible(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Video call',
+                                              style: TextStyle(
+                                                fontSize: 14,
+                                                fontWeight: FontWeight.w700,
+                                                color: textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              durationText,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.w500,
+                                                color: isMissed
+                                                    ? AppColors.error
+                                                    : textSecondary,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      // Call back button
+                                      InkWell(
+                                        onTap: () => context.push(
+                                            '/consultation/room/${widget.appointmentId}'),
+                                        borderRadius: BorderRadius.circular(16),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 10, vertical: 5),
+                                          decoration: BoxDecoration(
+                                            color: AppColors.primary,
+                                            borderRadius:
+                                                BorderRadius.circular(14),
+                                          ),
+                                          child: const Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(Icons.videocam_rounded,
+                                                  color: Colors.white, size: 14),
+                                              SizedBox(width: 4),
+                                              Text(
+                                                'Call',
+                                                style: TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 6),
+                                  // Time with NO tick icons
+                                  Text(
+                                    DateTimeUtils.formatLocalTime(
+                                        msg.sentAtUtc),
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      color: textSecondary.withOpacity(0.8),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        } else {
+                          bubbleWidget = Align(
                           alignment:
                               isMe ? Alignment.centerRight : Alignment.centerLeft,
                           child: Container(
@@ -568,6 +719,7 @@ class _UnifiedChatScreenState extends ConsumerState<UnifiedChatScreen> {
                             ),
                           ),
                         );
+                        }
 
                         // Smooth entry animation:
                         // 1. Expanding heightFactor gently glides previous messages upward with zero jump
