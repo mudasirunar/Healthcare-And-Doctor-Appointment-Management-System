@@ -138,6 +138,9 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
     final doctorRx = isDoctor && currentDoctorId.isNotEmpty
         ? (ref.watch(doctorPrescriptionsStreamProvider(currentDoctorId)).valueOrNull ?? [])
         : <PrescriptionModel>[];
+    final patientRx = isPatient
+        ? (ref.watch(patientPrescriptionsStreamProvider(patientId)).valueOrNull ?? [])
+        : <PrescriptionModel>[];
 
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
@@ -203,7 +206,7 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
             ? doctorRx.where((r) => r.patientId == patient.id).toList()
             : (isAdmin
                 ? allRx.where((r) => r.patientId == patient.id).toList()
-                : <PrescriptionModel>[]);
+                : patientRx);
 
         final consultedDoctorIds =
             patientAppointments.map((a) => a.doctorId).toSet();
@@ -213,8 +216,7 @@ class UnifiedPatientDetailScreen extends ConsumerWidget {
         return Scaffold(
           backgroundColor: AppColors.backgroundOf(context),
           appBar: AppBar(
-            // Top bar title is cleanly shortened to 'Patient Profile' per request
-            title: const Text('Patient Profile'),
+            title: Text(isPatient ? 'My Profile' : 'Patient Profile'),
             backgroundColor: surfaceColor,
             elevation: 0,
             scrolledUnderElevation: 0,

@@ -508,6 +508,24 @@ final doctorPrescriptionsStreamProvider =
       });
 });
 
+final patientPrescriptionsStreamProvider =
+    StreamProvider.family<List<PrescriptionModel>, String>((ref, patientId) {
+  return FirebaseFirestore.instance
+      .collection('prescriptions')
+      .where('patientId', isEqualTo: patientId)
+      .snapshots()
+      .handleError((e) {
+        debugPrint('patientPrescriptionsStreamProvider error: $e');
+      })
+      .map((s) {
+        final list = s.docs
+            .map((d) => PrescriptionModel.fromMap(d.data(), id: d.id))
+            .toList();
+        list.sort((a, b) => b.issuedAtUtc.compareTo(a.issuedAtUtc));
+        return list;
+      });
+});
+
 final pendingDoctorsProvider = StreamProvider<List<DoctorModel>>((ref) {
   final user = ref.watch(currentUserProvider);
   if (user == null || !user.isAdmin) return Stream.value(<DoctorModel>[]);

@@ -10,9 +10,10 @@ import '../../../../core/widgets/app_dialog.dart';
 import '../../../../core/widgets/app_snack_bar.dart';
 import '../../../../core/widgets/status_badge.dart';
 import '../../../appointment/domain/entities/appointment_model.dart';
+import '../../../auth/domain/entities/user_model.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
-import 'admin_doctor_detail_screen.dart';
-import 'admin_patient_detail_screen.dart';
+import '../../../doctor/presentation/screens/unified_doctor_detail_screen.dart';
+import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
 
 class AdminAppointmentDetailScreen extends ConsumerWidget {
   final String appointmentId;
@@ -31,6 +32,24 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
     final borderColor = AppColors.borderOf(context);
+
+    final currentUser = ref.watch(currentUserProvider);
+    final userRole = currentUser?.role ?? UserRole.admin;
+    final isDoctor = userRole == UserRole.doctor;
+    final isPatient = userRole == UserRole.patient;
+
+    final doctorRecord = (ref.watch(verifiedDoctorsStreamProvider).valueOrNull ?? [])
+        .where((d) => d.userId == currentUser?.id || d.id == currentUser?.id)
+        .firstOrNull;
+    final currentDoctorId = doctorRecord?.id ?? currentUser?.id ?? '';
+    final isCurrentDoctor = isDoctor &&
+        (appointment != null) &&
+        (appointment.doctorId == currentDoctorId ||
+            appointment.doctorId == currentUser?.id ||
+            appointment.doctorName == currentUser?.displayName);
+    final isCurrentPatient = isPatient &&
+        (appointment != null) &&
+        (appointment.patientId == currentUser?.id);
 
     if (appointment == null) {
       return Scaffold(
@@ -161,8 +180,9 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AdminDoctorDetailScreen(
+                  builder: (_) => UnifiedDoctorDetailScreen(
                     doctorId: appointment.doctorId,
+                    role: userRole,
                   ),
                 ),
               );
@@ -190,7 +210,9 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          appointment.doctorName,
+                          isCurrentDoctor
+                              ? '${appointment.doctorName} (You)'
+                              : appointment.doctorName,
                           style: AppTypography.bodyLarge.copyWith(
                             fontWeight: FontWeight.w600,
                             color: textPrimary,
@@ -217,8 +239,9 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => AdminPatientDetailScreen(
+                  builder: (_) => UnifiedPatientDetailScreen(
                     patientId: appointment.patientId,
+                    role: userRole,
                   ),
                 ),
               );
@@ -246,7 +269,9 @@ class AdminAppointmentDetailScreen extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          appointment.patientName,
+                          isCurrentPatient
+                              ? '${appointment.patientName} (You)'
+                              : appointment.patientName,
                           style: AppTypography.bodyLarge.copyWith(
                             fontWeight: FontWeight.w600,
                             color: textPrimary,

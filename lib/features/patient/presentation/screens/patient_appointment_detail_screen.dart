@@ -11,7 +11,9 @@ import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../consultation/presentation/screens/appointment_chat_screen.dart';
 import '../../../consultation/presentation/screens/prescription_viewer_screen.dart';
 import '../../../consultation/presentation/screens/video_consultation_screen.dart';
+import '../../../auth/domain/entities/user_model.dart';
 import 'doctor_details_screen.dart';
+import 'unified_patient_detail_screen.dart';
 
 class PatientAppointmentDetailScreen extends ConsumerWidget {
   final String appointmentId;
@@ -292,47 +294,61 @@ class PatientAppointmentDetailScreen extends ConsumerWidget {
         ),
         Divider(height: 1, indent: 78, endIndent: 20, color: borderColor),
 
-        // Patient Row (Non-clickable "You", as patient is viewing their own record)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.12),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(
-                  Icons.person_outline_rounded,
-                  color: AppColors.primary,
-                  size: 20,
+        // Patient Row (Clickable -> Opens UnifiedPatientDetailScreen)
+        InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => UnifiedPatientDetailScreen(
+                  patientId: appointment.patientId,
+                  role: UserRole.patient,
                 ),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '${appointment.patientName} (You)',
-                      style: AppTypography.bodyLarge.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Patient • ${appointment.patientEmail}',
-                      style: AppTypography.caption.copyWith(
-                        color: textSecondary,
-                      ),
-                    ),
-                  ],
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.person_outline_rounded,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${appointment.patientName} (You)',
+                        style: AppTypography.bodyLarge.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Patient • ${appointment.patientEmail}',
+                        style: AppTypography.caption.copyWith(
+                          color: textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: textSecondary),
+              ],
+            ),
           ),
         ),
         Divider(height: 1, color: borderColor),
