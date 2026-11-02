@@ -332,14 +332,8 @@ final liveCurrentUserProvider = StreamProvider<UserModel?>((ref) {
 });
 
 final currentUserProvider = StateProvider<UserModel?>((ref) {
-  ref.listen<AsyncValue<UserModel?>>(liveCurrentUserProvider, (prev, next) {
-    if (next.hasValue && next.value != null) {
-      ref.controller.state = next.value;
-    }
-  });
-  final liveUser = ref.watch(liveCurrentUserProvider).valueOrNull;
-  final authUser = ref.watch(currentUserStreamProvider).valueOrNull;
-  return liveUser ?? authUser;
+  final user = ref.watch(currentUserStreamProvider).valueOrNull;
+  return user;
 });
 
 // --- DOCTORS & SPECIALTIES (REAL-TIME STREAMS) ---

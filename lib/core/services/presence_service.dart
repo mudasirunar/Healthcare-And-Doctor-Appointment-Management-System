@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/widgets.dart';
 
 /// Service managing real-time online/offline presence for active users.
@@ -6,7 +5,6 @@ class PresenceService with WidgetsBindingObserver {
   PresenceService._();
   static final PresenceService instance = PresenceService._();
 
-  FirebaseFirestore get _firestore => FirebaseFirestore.instance;
   final Map<String, bool> _onlineStatusCache = {};
   String? _activeUserId;
   bool _isInitialized = false;
@@ -18,7 +16,7 @@ class PresenceService with WidgetsBindingObserver {
   }
 
   void initialize(String userId) {
-    if (userId.isEmpty) return;
+    if (userId.isEmpty || (_activeUserId == userId && _isInitialized)) return;
     _activeUserId = userId;
     _onlineStatusCache[userId] = true;
 
@@ -54,17 +52,8 @@ class PresenceService with WidgetsBindingObserver {
   }
 
   Future<void> setOnline(bool online) async {
-    final uid = _activeUserId;
-    if (uid == null || uid.isEmpty) return;
-
-    try {
-      await _firestore.collection('users').doc(uid).set({
-        'isOnline': online,
-        'lastSeenUtc': DateTime.now().toUtc().toIso8601String(),
-      }, SetOptions(merge: true));
-    } catch (e) {
-      debugPrint('Presence sync notice: $e');
-    }
+    // Permanently disabled: zero Firestore writes to prevent presence loops
+    return;
   }
 }
 

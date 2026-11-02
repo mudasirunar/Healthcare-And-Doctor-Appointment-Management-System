@@ -13,6 +13,17 @@
   ],
   "firestore": {
     "rules": "docs/firestore.rules"
+  },
+  "emulators": {
+    "firestore": {
+      "port": 8080,
+      "host": "0.0.0.0"
+    },
+    "ui": {
+      "enabled": true,
+      "port": 4000,
+      "host": "0.0.0.0"
+    }
   }
 }
 
