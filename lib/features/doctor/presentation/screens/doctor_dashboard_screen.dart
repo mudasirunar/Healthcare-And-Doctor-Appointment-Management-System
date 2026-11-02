@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/providers/app_providers.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_typography.dart';
 import '../../../../core/utils/date_time_utils.dart';
 import '../../../../core/utils/smart_search_utils.dart';
 import '../../../../core/widgets/app_dialog.dart';
@@ -14,6 +15,7 @@ import '../../../auth/domain/entities/user_model.dart';
 import '../../../consultation/presentation/screens/prescription_builder_dialog.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import '../../../patient/presentation/screens/unified_patient_detail_screen.dart';
+import 'doctor_practice_insights_screen.dart';
 import 'unified_specialties_screen.dart';
 import 'unified_specialty_doctors_screen.dart';
 
@@ -190,6 +192,9 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
         final doctor = docSnap.data;
         final fee = doctor?.consultationFee ?? 50.0;
         final totalEarnings = completedVisits.length * fee;
+        final int completionRate = allAppointments.isNotEmpty
+            ? ((completedVisits.length / allAppointments.length) * 100).round()
+            : 100;
 
         return ListView(
           controller: widget.scrollController,
@@ -255,7 +260,72 @@ class _DoctorDashboardScreenState extends ConsumerState<DoctorDashboardScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 22),
+            const SizedBox(height: 16),
+
+            // Flat Practice & Clinical Insights Banner (Matching Patient side style)
+            Divider(height: 1, color: borderColor),
+            InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const DoctorPracticeInsightsScreen(),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 44,
+                      height: 44,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.insights_rounded,
+                        color: AppColors.primary,
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Practice & Clinical Insights',
+                            style: AppTypography.bodyLarge.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            completedVisits.isEmpty
+                                ? 'Review clinical performance, revenue & volume trends'
+                                : '${completedVisits.length} visits completed • $completionRate% completion • \$${totalEarnings.toStringAsFixed(0)} revenue',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.caption.copyWith(
+                              color: textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.chevron_right_rounded, color: textSecondary),
+                  ],
+                ),
+              ),
+            ),
+            Divider(height: 1, color: borderColor),
+            const SizedBox(height: 20),
 
             // 2. Hero Active / Next Up Consultation Card
             if (heroAppointment != null) ...[

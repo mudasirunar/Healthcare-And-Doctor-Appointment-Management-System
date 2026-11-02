@@ -11,6 +11,7 @@ import '../../../appointment/domain/entities/appointment_model.dart';
 import '../../../auth/domain/entities/user_model.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import 'doctor_edit_profile_screen.dart';
+import 'doctor_practice_insights_screen.dart';
 import 'unified_doctor_detail_screen.dart';
 
 class DoctorSettingsScreen extends ConsumerStatefulWidget {
@@ -200,75 +201,100 @@ class _DoctorSettingsScreenState extends ConsumerState<DoctorSettingsScreen> {
 
             // 3. Practice Insights & Performance Metrics Card
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
-              child: Text(
-                'Practice Insights & Highlights',
-                style: AppTypography.headline.copyWith(
-                  fontSize: 15,
-                  color: textPrimary,
-                ),
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Practice Insights & Highlights',
+                    style: AppTypography.headline.copyWith(
+                      fontSize: 15,
+                      color: textPrimary,
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const DoctorPracticeInsightsScreen(),
+                        ),
+                      );
+                    },
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'View More',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                        ),
+                        SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios_rounded, size: 12),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: surfaceColor,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: borderColor),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _InsightStatBox(
-                            label: 'Rating Score',
-                            value: '⭐ ${doctor?.rating.toStringAsFixed(1) ?? "5.0"}',
-                            subtitle: '${doctor?.reviewCount ?? 0} patient reviews',
-                            textPrimary: textPrimary,
-                            textSecondary: textSecondary,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _InsightStatBox(
-                            label: 'Completed Visits',
-                            value: '${completedVisits.length}',
-                            subtitle: '$completionRate% completion',
-                            textPrimary: textPrimary,
-                            textSecondary: textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _InsightStatBox(
-                            label: 'Consultation Fee',
-                            value: '\$${fee.toStringAsFixed(0)}',
-                            subtitle: 'per session rate',
-                            textPrimary: textPrimary,
-                            textSecondary: textSecondary,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: _InsightStatBox(
-                            label: 'Earned Revenue',
-                            value: '\$${totalEarnings.toStringAsFixed(0)}',
-                            subtitle: 'from completed visits',
-                            textPrimary: textPrimary,
-                            textSecondary: textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      _DoctorSettingsInsightTile(
+                        title: 'Rating Score',
+                        value: '⭐ ${doctor?.rating.toStringAsFixed(1) ?? "5.0"}',
+                        subtitle: '${doctor?.reviewCount ?? 0} patient reviews',
+                        icon: Icons.star_border_rounded,
+                        surfaceColor: surfaceColor,
+                        borderColor: borderColor,
+                        textPrimary: textPrimary,
+                        textSecondary: textSecondary,
+                      ),
+                      const SizedBox(width: 12),
+                      _DoctorSettingsInsightTile(
+                        title: 'Completed Visits',
+                        value: '${completedVisits.length}',
+                        subtitle: '$completionRate% completion',
+                        icon: Icons.check_circle_outline_rounded,
+                        surfaceColor: surfaceColor,
+                        borderColor: borderColor,
+                        textPrimary: textPrimary,
+                        textSecondary: textSecondary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _DoctorSettingsInsightTile(
+                        title: 'Consultation Fee',
+                        value: '\$${fee.toStringAsFixed(0)}',
+                        subtitle: 'per session rate',
+                        icon: Icons.payments_outlined,
+                        surfaceColor: surfaceColor,
+                        borderColor: borderColor,
+                        textPrimary: textPrimary,
+                        textSecondary: textSecondary,
+                      ),
+                      const SizedBox(width: 12),
+                      _DoctorSettingsInsightTile(
+                        title: 'Earned Revenue',
+                        value: '\$${totalEarnings.toStringAsFixed(0)}',
+                        subtitle: 'from completed visits',
+                        icon: Icons.account_balance_wallet_outlined,
+                        surfaceColor: surfaceColor,
+                        borderColor: borderColor,
+                        textPrimary: textPrimary,
+                        textSecondary: textSecondary,
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
             const SizedBox(height: 22),
@@ -407,38 +433,79 @@ class _DoctorSettingsScreenState extends ConsumerState<DoctorSettingsScreen> {
   }
 }
 
-class _InsightStatBox extends StatelessWidget {
-  final String label;
+class _DoctorSettingsInsightTile extends StatelessWidget {
+  final String title;
   final String value;
   final String subtitle;
+  final IconData icon;
+  final Color surfaceColor;
+  final Color borderColor;
   final Color textPrimary;
   final Color textSecondary;
 
-  const _InsightStatBox({
-    required this.label,
+  const _DoctorSettingsInsightTile({
+    required this.title,
     required this.value,
     required this.subtitle,
+    required this.icon,
+    required this.surfaceColor,
+    required this.borderColor,
     required this.textPrimary,
     required this.textSecondary,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(fontSize: 11, color: textSecondary, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 2),
-          Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: textPrimary)),
-          const SizedBox(height: 1),
-          Text(subtitle, style: TextStyle(fontSize: 10, color: textSecondary)),
-        ],
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: surfaceColor,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: textSecondary,
+                    ),
+                  ),
+                ),
+                Icon(icon, size: 16, color: AppColors.primary),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: textPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                color: textSecondary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
