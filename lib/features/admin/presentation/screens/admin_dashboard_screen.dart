@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/widgets/app_bottom_nav_bar.dart';
 import '../../../../core/widgets/app_dialog.dart';
+import '../../../auth/domain/entities/user_model.dart';
 import '../../../doctor/domain/entities/doctor_model.dart';
 import 'admin_appointments_screen.dart';
 import 'admin_directory_screen.dart';
@@ -119,6 +120,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     // Watch pendingDoctorsProvider so real-time doctor registration listener stays active
     ref.watch(pendingDoctorsProvider);
+    final currentUser = ref.watch(currentUserProvider);
     final tabIndex = ref.watch(adminSelectedTabProvider);
     final analyticsAsync = ref.watch(adminAnalyticsProvider);
     final specialtiesAsync = ref.watch(specialtiesProvider);
@@ -133,6 +135,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
       extendBody: true,
       appBar: _buildContextualAppBar(
         context,
+        currentUser: currentUser,
         tabIndex: tabIndex,
         unreadNotificationsCount: unreadCount,
       ),
@@ -214,6 +217,7 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
 
   PreferredSizeWidget _buildContextualAppBar(
     BuildContext context, {
+    required UserModel? currentUser,
     required int tabIndex,
     required int unreadNotificationsCount,
   }) {
@@ -222,11 +226,64 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
     final textPrimary = AppColors.textPrimaryOf(context);
     final textSecondary = AppColors.textSecondaryOf(context);
 
-    final (String title, String subtitle, Widget? trailing) =
+    final (Widget leadingContent, Widget? trailingContent) =
         switch (tabIndex) {
       0 => (
-          'Admin Overview',
-          'Specialists, Patients & Daily Operations',
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
+                backgroundImage: currentUser?.avatarUrl != null
+                    ? NetworkImage(currentUser!.avatarUrl!)
+                    : null,
+                child: currentUser?.avatarUrl == null
+                    ? Text(
+                        currentUser != null &&
+                                currentUser.displayName.isNotEmpty
+                            ? currentUser.displayName[0].toUpperCase()
+                            : 'A',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.primary,
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'System Administrator',
+                      style: AppTypography.caption.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      currentUser?.displayName.isNotEmpty == true
+                          ? currentUser!.displayName
+                          : 'System Admin',
+                      style: AppTypography.headline.copyWith(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: textPrimary,
+                        letterSpacing: 0,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
           _NotificationBellButton(
             unreadCount: unreadNotificationsCount,
             onTap: () {
@@ -240,24 +297,90 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           ),
         ),
       1 => (
-          'Medical Directory',
-          'Specialists & Registered Patients',
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Medical Directory',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimary,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Specialists & Registered Patients',
+                style: AppTypography.caption.copyWith(
+                  fontSize: 12,
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
           null,
         ),
       2 => (
-          'Appointments & Records',
-          'Consultations, Schedules & Prescriptions',
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Appointments & Records',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimary,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Consultations, Schedules & Prescriptions',
+                style: AppTypography.caption.copyWith(
+                  fontSize: 12,
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
           null,
         ),
       _ => (
-          'Profile & Settings',
-          'Account Details & App Preferences',
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Profile & Settings',
+                style: AppTypography.headline.copyWith(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: textPrimary,
+                  letterSpacing: 0,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                'Account Details & App Preferences',
+                style: AppTypography.caption.copyWith(
+                  fontSize: 12,
+                  color: textSecondary,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
           null,
         ),
     };
 
     return PreferredSize(
-      preferredSize: const Size.fromHeight(72),
+      preferredSize: const Size.fromHeight(68),
       child: RepaintBoundary(
         child: Container(
           decoration: BoxDecoration(
@@ -267,33 +390,13 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
           child: SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
               child: Row(
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          title,
-                          style: AppTypography.headline.copyWith(
-                            fontSize: 19,
-                            color: textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          subtitle,
-                          style: AppTypography.caption.copyWith(
-                            color: textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
+                    child: leadingContent,
                   ),
-                  ?trailing,
+                  ?trailingContent,
                 ],
               ),
             ),

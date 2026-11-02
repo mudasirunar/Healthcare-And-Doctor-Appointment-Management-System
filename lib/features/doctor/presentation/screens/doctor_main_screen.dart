@@ -239,7 +239,7 @@ class _DoctorMainScreenState extends ConsumerState<DoctorMainScreen> {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: AppColors.primaryLight,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                 backgroundImage: currentUser?.avatarUrl != null
                     ? NetworkImage(currentUser!.avatarUrl!)
                     : null,

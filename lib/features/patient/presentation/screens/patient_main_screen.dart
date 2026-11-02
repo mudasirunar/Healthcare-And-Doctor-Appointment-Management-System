@@ -176,7 +176,7 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
             children: [
               CircleAvatar(
                 radius: 20,
-                backgroundColor: AppColors.primaryLight,
+                backgroundColor: AppColors.primary.withValues(alpha: 0.12),
                 backgroundImage: currentUser?.avatarUrl != null
                     ? NetworkImage(currentUser!.avatarUrl!)
                     : null,
@@ -209,7 +209,9 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      currentUser?.displayName ?? 'Patient',
+                      currentUser != null && currentUser.displayName.isNotEmpty
+                          ? '${currentUser.displayName[0].toUpperCase()}${currentUser.displayName.substring(1)}'
+                          : 'Patient',
                       style: AppTypography.headline.copyWith(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
