@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/widgets.dart';
 
 /// Service managing real-time online/offline presence for active users.
@@ -67,6 +68,11 @@ class PresenceService with WidgetsBindingObserver {
     _onlineStatusCache[uid] = online;
     if (_activeDoctorId != null) {
       _onlineStatusCache[_activeDoctorId!] = online;
+    }
+
+    final currentAuth = FirebaseAuth.instance.currentUser;
+    if (currentAuth == null || currentAuth.uid != uid) {
+      return;
     }
 
     try {

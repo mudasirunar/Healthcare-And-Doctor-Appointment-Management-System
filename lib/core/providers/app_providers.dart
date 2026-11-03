@@ -152,7 +152,13 @@ Future<void> appSignOut(WidgetRef ref) async {
   ref.read(patientSelectedTabProvider.notifier).state = 0;
   ref.read(doctorSelectedTabProvider.notifier).state = 0;
   ref.read(doctorAgendaFilterProvider.notifier).state = null;
-  ref.read(currentUserProvider.notifier).state = null;
+
+  // Set offline presence while still authenticated
+  try {
+    await PresenceService.instance.setOnline(false);
+  } catch (e) {
+    debugPrint('Presence sign-out notice: $e');
+  }
   NotificationService.instance.stopListening();
 
   try {
@@ -160,6 +166,8 @@ Future<void> appSignOut(WidgetRef ref) async {
   } catch (e) {
     debugPrint('Sign-out notice: $e');
   }
+
+  ref.read(currentUserProvider.notifier).state = null;
 
   // Invalidate all role-dependent providers to prevent stale permission-denied states
   ref.invalidate(adminAnalyticsProvider);
@@ -171,6 +179,7 @@ Future<void> appSignOut(WidgetRef ref) async {
   ref.invalidate(userAppointmentsProvider);
   ref.invalidate(verifiedDoctorsStreamProvider);
   ref.invalidate(readNotificationsProvider);
+  ref.invalidate(patientPrescriptionsStreamProvider);
 }
 
 
@@ -630,7 +639,11 @@ final doctorPrescriptionsStreamProvider =
 });
 
 final patientPrescriptionsStreamProvider =
-    StreamProvider.family<List<PrescriptionModel>, String>((ref, patientId) {
+    StreamProvider.autoDispose.family<List<PrescriptionModel>, String>((ref, patientId) {
+  final currentAuth = FirebaseAuth.instance.currentUser;
+  if (currentAuth == null || patientId.isEmpty) {
+    return Stream.value(<PrescriptionModel>[]);
+  }
   return FirebaseFirestore.instance
       .collection('prescriptions')
       .where('patientId', isEqualTo: patientId)
