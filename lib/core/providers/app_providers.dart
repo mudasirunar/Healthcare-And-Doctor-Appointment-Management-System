@@ -148,14 +148,12 @@ final doctorAgendaFilterProvider = StateProvider<String?>((ref) => null);
 
 /// Central sign-out routine: clears auth, resets all tab indices to 0, and invalidates stream providers
 Future<void> appSignOut(WidgetRef ref) async {
-  ref.read(adminSelectedTabProvider.notifier).state = 0;
-  ref.read(patientSelectedTabProvider.notifier).state = 0;
-  ref.read(doctorSelectedTabProvider.notifier).state = 0;
-  ref.read(doctorAgendaFilterProvider.notifier).state = null;
-
-  // Set offline presence while still authenticated
+  // Update offline presence asynchronously with timeout so network delay never blocks sign-out
   try {
-    await PresenceService.instance.setOnline(false);
+    await PresenceService.instance.setOnline(false).timeout(
+      const Duration(milliseconds: 300),
+      onTimeout: () {},
+    );
   } catch (e) {
     debugPrint('Presence sign-out notice: $e');
   }
@@ -169,7 +167,10 @@ Future<void> appSignOut(WidgetRef ref) async {
 
   ref.read(currentUserProvider.notifier).state = null;
 
-  // Invalidate all role-dependent providers to prevent stale permission-denied states
+  // Invalidate user and role-dependent providers to prevent stale cached states
+  ref.invalidate(currentUserStreamProvider);
+  ref.invalidate(liveCurrentUserProvider);
+  ref.invalidate(currentDoctorRecordStreamProvider);
   ref.invalidate(adminAnalyticsProvider);
   ref.invalidate(allDoctorsAdminProvider);
   ref.invalidate(allPatientsAdminProvider);
@@ -180,6 +181,12 @@ Future<void> appSignOut(WidgetRef ref) async {
   ref.invalidate(verifiedDoctorsStreamProvider);
   ref.invalidate(readNotificationsProvider);
   ref.invalidate(patientPrescriptionsStreamProvider);
+
+  // Reset tab indices to 0 for next login
+  ref.read(adminSelectedTabProvider.notifier).state = 0;
+  ref.read(patientSelectedTabProvider.notifier).state = 0;
+  ref.read(doctorSelectedTabProvider.notifier).state = 0;
+  ref.read(doctorAgendaFilterProvider.notifier).state = null;
 }
 
 

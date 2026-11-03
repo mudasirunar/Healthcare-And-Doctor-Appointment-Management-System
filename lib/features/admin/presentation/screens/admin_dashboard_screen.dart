@@ -93,27 +93,38 @@ class _AdminDashboardScreenState extends ConsumerState<AdminDashboardScreen> {
   }
 
   Future<void> _confirmSignOut() async {
-    final confirmed = await showDialog<bool>(
+    bool isSigningOut = false;
+    await showDialog(
       context: context,
-      builder: (ctx) => AppDialog(
-        icon: Icons.logout_rounded,
-        tone: AppDialogTone.destructive,
-        title: 'Sign Out?',
-        message: 'Are you sure you want to sign out of your account?',
-        cancelLabel: 'Stay Signed In',
-        onCancel: () => Navigator.pop(ctx, false),
-        confirmLabel: 'Sign Out',
-        confirmIsDestructive: true,
-        onConfirm: () => Navigator.pop(ctx, true),
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AppDialog(
+          icon: Icons.logout_rounded,
+          tone: AppDialogTone.destructive,
+          title: 'Sign Out?',
+          message: 'Are you sure you want to sign out of your account?',
+          cancelLabel: 'Stay Signed In',
+          cancelIsEnabled: !isSigningOut,
+          onCancel: isSigningOut ? null : () => Navigator.pop(ctx),
+          confirmLabel: isSigningOut ? 'Signing out...' : 'Sign Out',
+          confirmIsDestructive: true,
+          confirmIsLoading: isSigningOut,
+          onConfirm: isSigningOut
+              ? null
+              : () async {
+                  setDialogState(() => isSigningOut = true);
+                  try {
+                    await appSignOut(ref);
+                  } finally {
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      context.go('/login');
+                    }
+                  }
+                },
+        ),
       ),
     );
-
-    if (confirmed == true && mounted) {
-      await appSignOut(ref);
-      if (mounted) {
-        context.go('/');
-      }
-    }
   }
 
   @override

@@ -59,23 +59,36 @@ class _PatientMainScreenState extends ConsumerState<PatientMainScreen> {
   }
 
   void _handleSignOut() {
+    bool isSigningOut = false;
     showDialog(
       context: context,
-      builder: (ctx) => AppDialog(
-        icon: Icons.logout_rounded,
-        tone: AppDialogTone.destructive,
-        title: 'Sign Out',
-        message: 'Are you sure you want to sign out of your patient account?',
-        cancelLabel: 'Cancel',
-        confirmLabel: 'Sign Out',
-        confirmIsDestructive: true,
-        onConfirm: () async {
-          Navigator.pop(ctx);
-          await appSignOut(ref);
-          if (mounted) {
-            context.go('/');
-          }
-        },
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AppDialog(
+          icon: Icons.logout_rounded,
+          tone: AppDialogTone.destructive,
+          title: 'Sign Out',
+          message: 'Are you sure you want to sign out of your patient account?',
+          cancelLabel: 'Cancel',
+          cancelIsEnabled: !isSigningOut,
+          onCancel: isSigningOut ? null : () => Navigator.pop(ctx),
+          confirmLabel: isSigningOut ? 'Signing out...' : 'Sign Out',
+          confirmIsDestructive: true,
+          confirmIsLoading: isSigningOut,
+          onConfirm: isSigningOut
+              ? null
+              : () async {
+                  setDialogState(() => isSigningOut = true);
+                  try {
+                    await appSignOut(ref);
+                  } finally {
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (mounted) {
+                      context.go('/login');
+                    }
+                  }
+                },
+        ),
       ),
     );
   }
