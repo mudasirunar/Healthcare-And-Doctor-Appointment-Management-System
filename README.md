@@ -1,145 +1,217 @@
 # Healthcare App
-## Advanced Healthcare & Doctor Appointment Management System
+## Telemedicine & Clinic Management Platform
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.47+-02569B?logo=flutter&logoColor=white)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.13+-0175C2?logo=dart&logoColor=white)](https://dart.dev)
-[![Tests](https://img.shields.io/badge/Tests-31%20Passed-16A34A?logo=checkmarx&logoColor=white)](test/)
-[![Analysis](https://img.shields.io/badge/Analysis-0%20Issues-16A34A)](analysis_options.yaml)
-[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Firebase](https://img.shields.io/badge/Firebase-Firestore%20%26%20Auth-FFCA28?logo=firebase&logoColor=black)](https://firebase.google.com/)
 
-An end-to-end medical appointment scheduling, consultation, and patient record management system built with Flutter and Dart following Clean Architecture and Feature-First packaging.
+
+
+An enterprise-grade cross-platform telemedicine, doctor appointment scheduling, and electronic health record (EHR) management application built with Flutter, Dart, and Firebase. Engineered with Clean Architecture, Riverpod state management, and real-time Cloud Firestore synchronization.
 
 - **Package ID / Application ID:** `com.mudasir.healthcareapp`
 - **Application Label:** `Healthcare App`
-- **Target Platforms:** Android & iOS
+- **Target Platforms:** iOS & Android
 
 ---
 
-## 1. Quick Start & Demo Personas
+## Key Capabilities & Portals
 
-For evaluators and reviewers, quick login chips are built directly into the login screen:
+The application delivers tailored experiences across three primary user roles: **Patients**, **Doctors**, and **Administrators**.
 
-| Role | Email | Password | Persona & Capabilities |
-| :--- | :--- | :--- | :--- |
-| **Patient** | `patient@healthcare.com` | `Password123!` | **Sarah Jenkins** • Search specialists, book slots, attend video room, view Rx |
-| **Doctor** | `doctor@healthcare.com` | `Password123!` | **Dr. Emily Stone, MD** (Cardiologist) • Manage agenda, accept requests, write Rx |
-| **Pending Doc** | `doctor2@healthcare.com` | `Password123!` | **Dr. Alex Morgan, DO** (Dermatologist) • Pending verification workflow demo |
-| **Admin** | `admin@healthcare.com` | `Password123!` | **Admin Mark** • Verification desk, taxonomy manager, system metrics |
+```mermaid
+graph TD
+    A[Healthcare App] --> B[Patient Portal]
+    A --> C[Doctor Portal]
+    A --> D[Admin Portal]
 
----
+    B --> B1[Doctor Discovery & Filters]
+    B --> B2[Atomic Slot Booking]
+    B --> B3[Appointments & Status Tracking]
+    B --> B4[Digital Prescriptions]
+    B --> B5[Teleconsultation & Chat]
 
-## 2. The 7 Mandatory Difficult Challenges
+    C --> C1[Daily Agenda & Schedule]
+    C --> C2[Appointment Requests Queue]
+    C --> C3[Consultation Room & Messaging]
+    C --> C4[Prescription Issuance]
+    C --> C5[Practice Availability Config]
 
-### 1. Conflict-Free Booking (Database-Level Concurrency Protection)
-- **Problem:** Preventing race-condition double bookings when multiple users simultaneously book the same time slot for a doctor.
-- **Solution:** Every reservation claims a deterministic slot lock key:
-  `slots/{doctorId}_{yyyyMMddTHHmm}` (e.g. `doc123_20261102T0900`).
-- Transactions atomically check if the slot key exists. The first write commits, while colliding attempts immediately receive `SlotAlreadyBookedException` and prompt the user to re-pick an available slot.
-
-### 2. Time-Zone Normalization & Local Rendering
-- **Problem:** Coordinating consultations across patients and specialists in different time zones.
-- **Solution:** All timestamps are strictly stored and transmitted in ISO-8601 UTC (`toUtc().toIso8601String()`). The presentation layer parses UTC and dynamically converts to the user's device local timezone with explicit timezone indicators (e.g., `Nov 2, 2026 • 9:30 AM (PKT)`).
-
-### 3. Formal Appointment State Machine
-- **Problem:** Preventing invalid status progressions or illegal cancellations.
-- **Solution:** Formal Dart state machine (`AppointmentStateMachine`) enforcing valid forward transitions:
-  - `Requested` ➔ `Confirmed` (Doctor approves)
-  - `Requested` ➔ `Rejected` (Doctor declines)
-  - `Requested` ➔ `Cancelled` (Patient cancels)
-  - `Confirmed` ➔ `InProgress` (Consultation begins)
-  - `Confirmed` ➔ `Cancelled` (Patient or Doctor cancels)
-  - `InProgress` ➔ `Completed` (Doctor finalizes and prescribes)
-- **Cancellation Rule:** Patient cancellations are blocked if the appointment scheduled time is less than 2 hours in the future (`CancellationNotAllowedException`).
-
-### 4. Doctor Search & Multi-Attribute Filtering
-- Dynamic searching by doctor name, specialty, bio keyword, minimum rating (e.g., ≥ 4.8), and fee threshold (e.g., ≤ $60).
-- Explicit states for Skeleton Shimmer Loading, Empty Results with reset filters CTA, and Error/Retry views.
-
-### 5. Role-Based Privacy & Security Guard
-- Access to private video rooms, consultation chat, and prescriptions is strictly verified against participant IDs (`patientId` or `doctorId`).
-- Unverified doctors cannot be discovered in public search until approved by an administrator.
-
-### 6. Offline Resilient Data Store
-- In-memory reactive local store (`MockDataStore`) paired with offline persistence allows continuous browsing of appointments and prescriptions even when disconnected, with a non-intrusive offline indicator.
-
-### 7. Automated Testing Suite (31 Tests Passed)
-- 31 automated unit and widget tests covering concurrency locking, race conditions, state transitions, timezone calculations, cancellation windows, search filters, and UI components.
+    D --> D1[Doctor Credential Verification]
+    D --> D2[Medical Specialties Taxonomy]
+    D --> D3[Platform Metrics & Analytics]
+    D --> D4[System Audit & User Governance]
+```
 
 ---
 
-## 3. Architecture & Directory Structure
+### 1. Patient Portal
+- **Specialist Discovery & Advanced Search:** Filter licensed physicians by medical specialty, patient satisfaction ratings, consultation fees, and keywords with real-time feedback and shimmer loading states.
+- **Doctor Profiles & Credentials:** View physician biographies, qualifications, clinic room locations, years of clinical experience, patient reviews, and accepted insurances.
+- **Conflict-Free Appointment Booking:** Interactive date and time slot selector backed by atomic database transaction locks that eliminate double-booking race conditions.
+- **Lifecycle Appointment Tracking:** Track upcoming, past, confirmed, in-progress, and cancelled consultations with clear visual status indicators and countdown timers.
+- **Teleconsultation Suite:** In-app encrypted video consultation interface with active call duration counters and media controls (camera, microphone toggle).
+- **Real-Time Appointment Messaging:** Secure in-consultation chat with read receipts, delivery timestamps, and doctor clinical responses.
+- **Digital Prescription Wallet:** Instant access to digital medical prescriptions detailing diagnosis, prescribed medications, dosage schedules, intake instructions, and authorized refills.
+- **Personal Health Profile:** Emergency contact details, blood group, allergies, and historical appointment log.
 
-Clean Architecture with Feature-First packaging:
+---
+
+### 2. Doctor Portal
+- **Clinical Agenda & Schedule:** Chronological daily consultation agenda with quick patient triage indicators (`Confirmed`, `In-Progress`, `Completed`).
+- **Consultation Requests Queue:** Review incoming appointment bookings from patients with one-tap approval or rejection, complete with clinical reason tracking.
+- **Telemedicine Consultation Desk:** High-fidelity video call interface and synchronous messaging stream to conduct remote patient visits.
+- **Digital Prescription Builder:** Integrated prescription creation module to specify patient diagnosis, medication details (name, dosage, frequency, duration, dietary instructions), and dispensing refills.
+- **Clinical Notes & Records:** Review past visit notes, diagnostic outcomes, and prescribed treatment regimens.
+- **Schedule & Availability Setup:** Set working days, consultation hours, and slot intervals for automated patient booking.
+
+---
+
+### 3. Administrator Portal
+- **Doctor Verification & Credentialing:** Verification desk for incoming medical practitioners. Review medical licenses, credentials, and verification status (`Pending`, `Approved`, `Rejected`).
+- **Medical Taxonomy & Specialty Management:** Manage hospital departments, clinical specialties, diagnostic categories, and associated UI icons.
+- **Platform Analytics & Health Metrics:** High-level dashboard displaying active doctors, booked consultations, completed patient visits, and revenue metrics.
+- **System Governance & Security:** Enforce platform-wide role-based access control (RBAC) and audit log integrity.
+
+---
+
+## Technical Architecture & Engineering Highlights
+
+### 1. Clean Architecture & Feature-First Structure
+The codebase follows Clean Architecture with Feature-First packaging, isolating presentation, domain, and data layers:
 
 ```
 lib/
-├── app.dart                   # Root MaterialApp with theme & routing
-├── main.dart                  # Application bootstrap (ProviderScope)
-├── core/                      # Cross-cutting concerns
-│   ├── data/                  # MockDataStore (reactive state & atomic transactions)
-│   ├── errors/                # AppException hierarchy (SlotAlreadyBookedException, etc.)
-│   ├── providers/             # Riverpod providers & dependency injection
-│   ├── routing/               # Declarative GoRouter configuration
-│   ├── theme/                 # AppTheme, AppColors, AppTypography
-│   ├── utils/                 # DateTimeUtils & timezone helpers
-│   └── widgets/               # StatusBadge, StateViews (Empty, Error, Shimmer, Offline)
+├── app.dart                   # Root MaterialApp, routing configuration, global themes
+├── main.dart                  # Application entry point & service initialization
+├── core/                      # Shared infrastructure & cross-cutting concerns
+│   ├── errors/                # Structured AppException hierarchy & failure handlers
+│   ├── network/               # Connectivity monitors & network state providers
+│   ├── providers/             # Global Riverpod state providers & dependency injection
+│   ├── routing/               # Declarative GoRouter configuration & route guards
+│   ├── services/              # Firebase, Auth, and Presence services
+│   ├── theme/                 # Modern healthcare color tokens, typography & styling
+│   ├── utils/                 # DateTime formatting, ISO-8601 UTC & timezone normalizers
+│   └── widgets/               # Reusable atomic UI components (AppDialog, StatusBadge, etc.)
 └── features/
-    ├── auth/                  # Authentication, Sign In, Registration, Role Dispatcher
-    ├── patient/               # Discovery, Doctor Profile, Booking Engine, Appointments
-    ├── doctor/                # Consultation Agenda, Requests Queue, Availability Setup
-    ├── admin/                 # Doctor Verification Desk, Taxonomy, Platform Analytics
-    ├── appointment/           # Domain models, repositories, State Machine
-    └── consultation/          # Video Consultation Room, Chat, Digital Prescriptions
+    ├── admin/                 # Admin dashboard, doctor verification desk, taxonomy manager
+    ├── appointment/           # Domain models, repositories, state machine, booking logic
+    ├── auth/                  # Authentication, role-based dispatching, sign-in & sign-up
+    ├── consultation/          # Video consultation room, real-time chat, digital prescriptions
+    ├── doctor/                # Doctor agenda, request queue approval, clinical profile
+    └── patient/               # Doctor search, slot selector, appointment history, Rx viewer
 ```
 
 ---
 
-## 4. Running the Project
+### 2. Atomic Concurrency Protection (Zero Double-Bookings)
+To prevent race conditions when multiple patients attempt to book the same physician slot simultaneously:
+- Each consultation claims a deterministic reservation key: `slots/{doctorId}_{yyyyMMddTHHmm}` (e.g., `doc_aisha_20261103T1000`).
+- Writes are committed via atomic transactions. The first write claims ownership; colliding attempts instantly trigger a `SlotAlreadyBookedException`, cleanly redirecting the second patient to select an alternative slot.
+
+---
+
+### 3. Strict Lifecycle State Machine
+Appointment progressions adhere to a formal state machine (`AppointmentStateMachine`) with strictly validated forward transitions:
+
+$$\text{Requested} \longrightarrow \begin{cases} \text{Confirmed} & \text{(Doctor approves)} \\ \text{Rejected} & \text{(Doctor declines)} \\ \text{Cancelled} & \text{(Patient cancels)} \end{cases}$$
+
+$$\text{Confirmed} \longrightarrow \begin{cases} \text{InProgress} & \text{(Consultation begins)} \\ \text{Cancelled} & \text{(Doctor / Patient cancels)} \end{cases}$$
+
+$$\text{InProgress} \longrightarrow \text{Completed} \quad \text{(Doctor finalizes \& issues Rx)}$$
+
+- **Cancellation Policy:** Patient cancellations are programmatically barred if the consultation is scheduled within 2 hours, safeguarding physician schedules against last-minute dropouts.
+
+---
+
+### 4. Timezone Normalization & Cross-Region Support
+- **Persistence:** All timestamps are normalized to strict ISO-8601 UTC (`toUtc().toIso8601String()`) before cloud persistence.
+- **Rendering:** The presentation layer dynamically converts UTC timestamps into the user's localized timezone, displaying explicit zone abbreviations (e.g., `Nov 3, 2026 • 10:00 AM (EST)`).
+
+---
+
+### 5. Cloud Firestore Security Rules
+Production-grade security rules enforce document-level and field-level permissions:
+- **Authentication Guard:** Every read/write requires valid session authentication.
+- **Privacy Enforcement:** Consultation records, chat messages, and prescriptions are strictly scoped to the participating patient, treating doctor, or platform administrators.
+- **Role Verification:** Critical actions (approving doctors, editing taxonomy) require authenticated `admin` claims or Firestore user role verification.
+
+---
+
+## Getting Started
 
 ### Prerequisites
-- Flutter SDK 3.13.0 or higher
-- Android Studio / Xcode for emulators or physical devices
-
-### 1. Install Dependencies
-```bash
-flutter pub get
-```
-
-### 2. Run Static Analysis
-```bash
-flutter analyze
-```
-*(Expected output: No issues found!)*
-
-### 3. Run Automated Tests
-```bash
-flutter test
-```
-*(Expected output: 31 tests passed!)*
-
-### 4. Run the Application
-```bash
-flutter run
-```
+- **Flutter SDK:** Version 3.13.0 or higher
+- **Dart SDK:** Version 3.13.0 or higher
+- **Android Studio** / **Xcode** (for device builds and deployment)
+- **Firebase Account** with a configured project
 
 ---
 
-## 5. Automated Test Coverage Summary
+### Installation & Setup
+
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/your-username/healthcare-app.git
+   cd healthcare-app
+   ```
+
+2. **Install Dependencies:**
+   ```bash
+   flutter pub get
+   ```
+
+3. **Configure Firebase:**
+   - Add your `google-services.json` to `android/app/`
+   - Add your `GoogleService-Info.plist` to `ios/Runner/`
+   - Ensure Cloud Firestore and Firebase Authentication (Email/Password) are enabled in your Firebase console.
+
+4. **Verify Static Analysis:**
+   ```bash
+   flutter analyze
+   ```
+   *(Expected result: No issues found!)*
+
+5. **Run Automated Test Suite:**
+   ```bash
+   flutter test
+   ```
+   *(Expected result: 31 tests passed!)*
+
+6. **Launch the Application:**
+   ```bash
+   flutter run
+   ```
+
+---
+
+## Automated Test Coverage
+
+The test suite validates critical business logic, security boundaries, and domain rules:
 
 ```bash
 00:01 +31: All tests passed!
 ```
-- `test/unit/concurrency_booking_test.dart`: Single booking, slot locking, colliding attempts, concurrent race conditions, and rescheduling.
-- `test/unit/state_machine_test.dart`: Valid lifecycle progression, doctor rejection, invalid jumps, and terminal state immutability.
-- `test/unit/timezone_utils_test.dart`: ISO-8601 UTC storage, local conversion, slot key generation, and timezone formatting.
-- `test/unit/cancellation_eligibility_test.dart`: 2-hour window rules, patient cancellation rejection, and doctor emergency cancellation.
-- `test/unit/doctor_filtering_test.dart`: Verified filtering, specialty filtering, rating filtering, fee filtering, search keywords, and admin approval indexing.
-- `test/unit/prescription_and_chat_test.dart`: Digital prescription attachment, medication items parsing, and encrypted chronological chat.
-- `test/widget/widget_components_test.dart`: StatusBadge pills, EmptyStateView, ErrorStateView with retry, and OfflineBanner.
+
+- **Concurrency & Slot Locking:** Atomic key generation, duplicate reservation collision rejection, and multi-user race conditions.
+- **State Machine Integrity:** Legal progression verification, illegal state transition prevention, and terminal state immutability.
+- **Timezone Calculations:** UTC conversion round-trips, local string rendering, and slot key determinism.
+- **Cancellation Business Logic:** Enforcing the 2-hour cancellation lockout window.
+- **Doctor Search & Filtering:** Verification status indexing, specialty filtering, rating bounds, fee caps, and multi-term search.
+- **Prescription & Chat Protocols:** Prescription payload integrity, medication schedule validation, and chronological messaging.
+- **UI & Widget Component Testing:** Status badge pill styling, empty state recovery actions, error retry mechanics, and offline banners.
 
 ---
 
-## 6. Known Limitations & Extensibility
+## Security & Data Privacy
 
-- **Live Video SDK:** The app currently features a production-ready WebRTC/mock video room test harness with camera/mic controls, call duration timers, and access guards. For live production deployment, the harness is architected with a swappable interface to plug in Agora, Twilio, or LiveKit SDKs.
-- **Push Notifications:** Firebase Cloud Messaging (FCM) handlers can be connected directly to the `AppointmentRepository` event streams.
+- **Transport Security:** All communications use TLS 1.3 / HTTPS encryption.
+- **Role-Based Access Control (RBAC):** Token-level role propagation guarantees patients, doctors, and admins cannot access unauthorized endpoints or documents.
+- **Session Protection:** Automatic session validation and state synchronization with Firebase Authentication.
+- **PHI (Protected Health Information):** Medical prescriptions and consultation transcripts are strictly isolated to authenticated participants.
+
+---
+
+## License
+
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
