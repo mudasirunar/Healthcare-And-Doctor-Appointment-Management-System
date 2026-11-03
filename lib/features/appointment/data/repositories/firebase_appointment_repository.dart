@@ -118,6 +118,11 @@ class FirebaseAppointmentRepository implements AppointmentRepository {
 
     final current = AppointmentModel.fromMap(snapshot.data()!, id: snapshot.id);
 
+    // If already at targetStatus, return current record idempotently
+    if (current.status == targetStatus) {
+      return current;
+    }
+
     // Apply strict state machine validation
     final updated = AppointmentStateMachine.transition(
       appointment: current,

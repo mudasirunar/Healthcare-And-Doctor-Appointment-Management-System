@@ -39,7 +39,6 @@ class _PatientPrescriptionsScreenState
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
-    final aptRepo = ref.watch(appointmentRepositoryProvider);
     final isStandalone =
         widget.isStandalone || (ModalRoute.of(context)?.canPop ?? false);
     final surfaceColor = AppColors.surfaceOf(context);
@@ -60,53 +59,56 @@ class _PatientPrescriptionsScreenState
         ),
         Divider(height: 1, color: borderColor),
 
-        // Prescriptions List
+        // Prescriptions List (Live Streamed from Firestore)
         Expanded(
-          child: FutureBuilder<List<PrescriptionModel>>(
-            future: user != null
-                ? aptRepo.getPrescriptionsForPatient(user.id)
-                : null,
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
-              final list = snapshot.data ?? [];
-              if (list.isEmpty) {
-                return const EmptyStateView(
-                  icon: Icons.receipt_long_rounded,
-                  title: 'No Digital Prescriptions',
-                  description:
-                      'Prescriptions issued by your consulting doctor after completed sessions will appear here.',
-                );
-              }
+          child: user == null
+              ? const Center(child: CircularProgressIndicator())
+              : ref.watch(patientPrescriptionsStreamProvider(user.id)).when(
+                    loading: () =>
+                        const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(
+                      child: Text(
+                        'Unable to load prescriptions: $e',
+                        style: TextStyle(color: textSecondary),
+                      ),
+                    ),
+                    data: (list) {
+                      if (list.isEmpty) {
+                        return const EmptyStateView(
+                          icon: Icons.receipt_long_rounded,
+                          title: 'No Digital Prescriptions',
+                          description:
+                              'Prescriptions issued by your consulting doctor after completed sessions will appear here.',
+                        );
+                      }
 
-              final results =
-                  SmartSearchEngine.filterAndSort<PrescriptionModel>(
-                items: list,
-                query: _searchQuery,
-                primaryTextBuilder: (rx) => rx.doctorName,
-                secondaryTextsBuilder: (rx) => [
-                  rx.id,
-                  rx.diagnosis,
-                  rx.doctorSpecialty,
-                  if (rx.notes != null) rx.notes!,
-                  ...rx.medications.map((m) => '${m.name} ${m.dosage}'),
-                ],
-                fallbackComparator: (a, b) =>
-                    b.issuedAtUtc.compareTo(a.issuedAtUtc),
-              );
+                      final results =
+                          SmartSearchEngine.filterAndSort<PrescriptionModel>(
+                        items: list,
+                        query: _searchQuery,
+                        primaryTextBuilder: (rx) => rx.doctorName,
+                        secondaryTextsBuilder: (rx) => [
+                          rx.id,
+                          rx.diagnosis,
+                          rx.doctorSpecialty,
+                          if (rx.notes != null) rx.notes!,
+                          ...rx.medications.map((m) => '${m.name} ${m.dosage}'),
+                        ],
+                        fallbackComparator: (a, b) =>
+                            b.issuedAtUtc.compareTo(a.issuedAtUtc),
+                      );
 
-              if (results.isEmpty) {
-                return Center(
-                  child: Text(
-                    'No matching prescriptions found.',
-                    style:
-                        AppTypography.bodyMedium.copyWith(color: textSecondary),
-                  ),
-                );
-              }
+                      if (results.isEmpty) {
+                        return Center(
+                          child: Text(
+                            'No matching prescriptions found.',
+                            style: AppTypography.bodyMedium
+                                .copyWith(color: textSecondary),
+                          ),
+                        );
+                      }
 
-              return ListView.separated(
+                      return ListView.separated(
                 controller: widget.scrollController,
                 padding: const EdgeInsets.only(top: 4, bottom: 118),
                 itemCount: results.length,

@@ -15,6 +15,7 @@ class AppointmentStateMachine {
     },
     AppointmentStatus.confirmed: {
       AppointmentStatus.inProgress,
+      AppointmentStatus.completed,
       AppointmentStatus.cancelled,
     },
     AppointmentStatus.inProgress: {
@@ -28,6 +29,7 @@ class AppointmentStateMachine {
 
   /// Returns whether a transition from [current] to [target] is structurally valid
   static bool canTransition(AppointmentStatus current, AppointmentStatus target) {
+    if (current == target) return true;
     final targets = _allowedTransitions[current];
     return targets != null && targets.contains(target);
   }
@@ -43,6 +45,11 @@ class AppointmentStateMachine {
     String? cancellationReason,
   }) {
     final currentStatus = appointment.status;
+
+    // Idempotent check: If already in target status, return cleanly without error
+    if (currentStatus == targetStatus) {
+      return appointment;
+    }
 
     // 1. Structural transition validation
     if (!canTransition(currentStatus, targetStatus)) {

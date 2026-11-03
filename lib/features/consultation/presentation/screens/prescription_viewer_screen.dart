@@ -224,29 +224,48 @@ class PrescriptionViewerScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Text(
-                                      med.name,
-                                      style: AppTypography.bodyLarge.copyWith(fontWeight: FontWeight.w700, color: textPrimary),
+                                    Flexible(
+                                      child: Text(
+                                        med.name,
+                                        style: AppTypography.bodyLarge.copyWith(
+                                          fontWeight: FontWeight.w700,
+                                          color: textPrimary,
+                                        ),
+                                      ),
                                     ),
+                                    const SizedBox(width: 6),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 5,
+                                        vertical: 1,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.secondaryLightOf(context),
-                                        borderRadius: BorderRadius.circular(6),
+                                        color:
+                                            AppColors.surfaceVariantOf(context),
+                                        borderRadius: BorderRadius.circular(3),
+                                        border: Border.all(color: borderColor),
                                       ),
                                       child: Text(
                                         med.dosage,
-                                        style: AppTypography.caption.copyWith(color: AppColors.secondary, fontWeight: FontWeight.w700),
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          color: textSecondary,
+                                          fontWeight: FontWeight.w600,
+                                          letterSpacing: 0.1,
+                                        ),
                                       ),
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 2),
+                                const SizedBox(height: 4),
                                 Text(
-                                  'Frequency: ${med.frequency} • Duration: ${med.duration}',
-                                  style: AppTypography.bodyMedium.copyWith(color: textSecondary),
+                                  '${med.frequency} • ${med.duration}',
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: textSecondary,
+                                  ),
                                 ),
                                 if (med.instructions != null) ...[
                                   const SizedBox(height: 2),

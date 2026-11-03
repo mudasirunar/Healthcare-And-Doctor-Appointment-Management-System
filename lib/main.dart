@@ -13,7 +13,7 @@ const bool kUseLocalFirestore = true;
 
 /// Current Wi-Fi IP of this Mac running the Firestore emulator.
 /// Allows physical iPhones and Android phones on the same Wi-Fi network to connect.
-const String kMacLocalIp = '10.238.43.141';
+const String kMacLocalIp = '10.248.67.141';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,8 +27,11 @@ void main() async {
 
     // Route Firestore to local emulator if enabled
     if (kUseLocalFirestore) {
-      // Connect to Mac's emulator (works across iOS Simulator, Android Emulator, and physical Wi-Fi devices)
-      final host = kMacLocalIp;
+      // Connect to Mac's emulator (iOS Simulator uses 127.0.0.1, physical Wi-Fi devices use Mac Wi-Fi IP)
+      String host = kMacLocalIp;
+      if (Platform.isIOS && Platform.environment.containsKey('SIMULATOR_DEVICE_NAME')) {
+        host = '127.0.0.1';
+      }
       FirebaseFirestore.instance.useFirestoreEmulator(host, 8080);
       FirebaseFirestore.instance.settings = const Settings(persistenceEnabled: false);
       debugPrint('⚡ Connected FirebaseFirestore to Local Emulator at $host:8080');

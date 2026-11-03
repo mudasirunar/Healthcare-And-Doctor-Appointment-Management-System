@@ -65,9 +65,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go('/');
       }
     } catch (e) {
-      setState(() {
-        _errorMessage = e.toString();
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString();
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
