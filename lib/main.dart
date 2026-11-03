@@ -9,11 +9,11 @@ import 'core/services/preferences_service.dart';
 
 /// Set to true for local testing with zero quota and instant responses.
 /// Set to false before building the production release APK.
-const bool kUseLocalFirestore = true;
+const bool kUseLocalFirestore = false;
 
 /// Current Wi-Fi IP of this Mac running the Firestore emulator.
 /// Allows physical iPhones and Android phones on the same Wi-Fi network to connect.
-const String kMacLocalIp = '192.168.1.105';
+const String kMacLocalIp = 'Your IP Address';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
